@@ -10,6 +10,7 @@
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20230717.1",
     "@skeletonlabs/skeleton": "^1.10.0",
     "@sveltejs/adapter-auto": "^2.0.0",
     "@sveltejs/adapter-cloudflare": "^2.3.1",

@@ -6,7 +6,14 @@ declare global {
 		// interface Locals {}
 		// interface PageData {}
 		// interface Platform {}
+
+		interface Platform {
+			env: {
+				CF_IMAGES_API_KEY: string,
+				ACCOUNT_ID: string
+			}
+		}
 	}
 }
 
-export {};
+export { };

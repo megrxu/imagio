@@ -4,6 +4,7 @@
 	import { Progress } from "@svelteuidev/core";
 	import type { Image } from "$lib/types";
 	import { nanoid } from "nanoid";
+	import { upload_proxy as uploadImage } from "$lib/proxy";
 
 	let files: FileList;
 	let placeholder: Boolean = true;
@@ -21,10 +22,9 @@
 				reader.addEventListener("load", function () {
 					const fileExt = file.name.split(".").pop();
 					const image: Image = {
-						nanoId: nanoid(16) + "." + fileExt,
 						src: reader.result,
-						filename: file.name,
-						mime: file.type,
+						file: file,
+						alt: nanoid(),
 					};
 					images = [...images, image];
 				});
@@ -33,14 +33,15 @@
 		}
 	}
 
-	function upload() {
-		if (files) {
+	async function doUpload() {
+		if (images) {
 			uploading = true;
 			let uploaded_cnt = 0;
-			for (const file in files) {
+			images.forEach(async (image: Image) => {
+				let resp = await uploadImage(image);
 				uploaded_cnt += 1;
 				uploaded = (uploaded_cnt / files.length) * 100;
-			}
+			});
 		}
 	}
 </script>
@@ -62,7 +63,7 @@
 				<label for="uploads" class="w-full cursor-pointer">Select</label
 				>
 			</Button>
-			<Button type="submit" color="teal" ripple on:click={upload}
+			<Button type="submit" color="teal" ripple on:click={doUpload}
 				>Upload</Button
 			>
 		</Flex>
@@ -82,7 +83,7 @@
 				{#each images as image}
 					<Grid.Col span={3}>
 						<figure>
-							<img src={String(image.src)} alt={image.nanoId} />
+							<img src={String(image.src)} alt={image.alt} />
 						</figure>
 					</Grid.Col>
 				{/each}
