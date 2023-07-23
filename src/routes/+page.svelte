@@ -41,8 +41,10 @@
 			images.forEach(async (image: Image) => {
 				let resp: Response = await uploadImage(image);
 				let res = await resp.text();
+				console.log(res);
 				let uploadedImage: UploadResp = JSON.parse(res);
 				if (uploadedImage.success == true) {
+					console.log(uploadImage);
 					uploaded_cnt += 1;
 					uploaded = (uploaded_cnt / files.length) * 100;
 					uploadedImages = [...uploadedImages, uploadedImage];
