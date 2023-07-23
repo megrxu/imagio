@@ -1,16 +1,16 @@
-export type Image = {
+export interface Image {
     src: string | ArrayBuffer | null;
     file: File,
     alt: string;
 };
 
-export type CfImagesResp<T> = {
+export type CfImagesResp<Type> = {
     success: Boolean,
     errors: object[],
-    result: T
+    result: Type
 }
 
-export type UploadResResp = {
+export interface UploadResResp {
     filename: string,
     id: string,
     meta: object,
@@ -18,7 +18,7 @@ export type UploadResResp = {
     variants: string[]
 }
 
-export type ListResResp = {
+export interface ListResResp {
     images: UploadResResp[]
 }
 

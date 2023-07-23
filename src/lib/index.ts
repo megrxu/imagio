@@ -1,1 +1,5 @@
-// place files you want to import through the `$lib` alias in this folder.
+export async function clickToCopy(text: string | undefined) {
+    if (text) {
+        await navigator.clipboard.writeText(text);
+    }
+}

@@ -17,4 +17,4 @@ To build and deploy ImmI, follow the steps below:
 ImmI provides the following endpoints:
 
 - POST: `/api/upload` - Use this endpoint to upload images.
-- GET: `/`, `/show`, `/api/list` - Use these endpoints to view and list uploaded images.
+- GET: `/`, `/upload`, `/api/list` - Use these endpoints to upload and list uploaded images.
