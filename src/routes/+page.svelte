@@ -6,7 +6,7 @@
 	import { nanoid } from "nanoid";
 	import { upload_proxy as uploadImage } from "$lib/proxy";
 	import { Loader, Alert } from "@svelteuidev/core";
-	import { InfoCircled, Check } from "radix-icons-svelte";
+	import { Check } from "radix-icons-svelte";
 
 	let files: FileList;
 	let placeholder: Boolean = true;
@@ -24,7 +24,6 @@
 			for (const file of files) {
 				const reader = new FileReader();
 				reader.addEventListener("load", function () {
-					const fileExt = file.name.split(".").pop();
 					const image: Image = {
 						src: reader.result,
 						file: file,
@@ -44,10 +43,8 @@
 			images.forEach(async (image: Image) => {
 				let resp: Response = await uploadImage(image);
 				let res = await resp.text();
-				console.log(res);
 				let uploadedImage: UploadResp = JSON.parse(res);
 				if (uploadedImage.success == true) {
-					console.log(uploadImage);
 					uploaded_cnt += 1;
 					uploaded = (uploaded_cnt / files.length) * 100;
 					uploadedImages = [...uploadedImages, uploadedImage];
@@ -113,7 +110,7 @@
 					{#if uploaded < 100}
 						<Loader size={48} class="mr-4" /> Uploading...
 					{:else}
-						<Check size={36} class="mr-4" /> Done!
+						<Check size={24} class="mr-4" /> Done!
 					{/if}
 				</Flex>
 				<Progress

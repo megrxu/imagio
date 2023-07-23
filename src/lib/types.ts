@@ -4,14 +4,23 @@ export type Image = {
     alt: string;
 };
 
-export type UploadResp = {
+export type CfImagesResp<T> = {
     success: Boolean,
     errors: object[],
-    result: {
-        filename: string,
-        id: string,
-        meta: object,
-        uploaded: string,
-        variants: URL[]
-    }
+    result: T
 }
+
+export type UploadResResp = {
+    filename: string,
+    id: string,
+    meta: object,
+    uploaded: string,
+    variants: string[]
+}
+
+export type ListResResp = {
+    images: UploadResResp[]
+}
+
+export type ListResp = CfImagesResp<ListResResp>;
+export type UploadResp = CfImagesResp<UploadResResp>;
