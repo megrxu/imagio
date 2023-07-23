@@ -1,10 +1,12 @@
 <script lang="ts">
-	import { Container, Center, Grid, Flex } from "@svelteuidev/core";
+	import type { Image, UploadResp } from "$lib/types";
+	import { Container, Center, Grid, Flex, Tabs } from "@svelteuidev/core";
 	import { Button } from "@svelteuidev/core";
 	import { Progress } from "@svelteuidev/core";
-	import type { Image, UploadResp } from "$lib/types";
 	import { nanoid } from "nanoid";
 	import { upload_proxy as uploadImage } from "$lib/proxy";
+	import { Loader, Alert } from "@svelteuidev/core";
+	import { InfoCircled, Check } from "radix-icons-svelte";
 
 	let files: FileList;
 	let placeholder: Boolean = true;
@@ -12,6 +14,7 @@
 	let uploading: Boolean = false;
 	let uploaded = 0;
 	let uploadedImages: UploadResp[] = [];
+	let alert: string | null = null;
 
 	function onChange() {
 		if (files) {
@@ -49,7 +52,7 @@
 					uploaded = (uploaded_cnt / files.length) * 100;
 					uploadedImages = [...uploadedImages, uploadedImage];
 				} else {
-					console.log(`Image ${image.file.name} did not uploaded.`);
+					alert = `Image ${image.file.name} did not uploaded.`;
 				}
 			});
 		}
@@ -59,6 +62,11 @@
 <Container class="w-2/3">
 	<Flex class="h-screen" justify="center" align="center" direction="column">
 		<Center class="m-8 text-xl font-black">Upload Images</Center>
+		{#if alert}
+			<Alert title="Alert!">
+				{alert}
+			</Alert>
+		{/if}
 		<Flex class="m-8" justify="center" align="center" gap="xl">
 			<Button ripple class="p-0">
 				<input
@@ -78,9 +86,9 @@
 			>
 		</Flex>
 		{#if placeholder}
-			<label for="uploads" class="h-64 w-full">
+			<label for="uploads" class="h-96 w-full">
 				<Flex
-					class="h-64 w-full border-dashed border-zinc-300 border-2 rounded-lg text-lg text-slate-300"
+					class="h-96 w-full border-dashed border-zinc-300 border-2 rounded-lg text-lg text-slate-300"
 					justify="center"
 					align="center"
 					direction="column"
@@ -89,7 +97,7 @@
 				</Flex>
 			</label>
 		{:else}
-			<Grid class="h-64 w-full overflow-y-auto ">
+			<Grid class="h-96 w-full overflow-y-auto ">
 				{#each images as image}
 					<Grid.Col span={3}>
 						<figure>
@@ -99,8 +107,22 @@
 				{/each}
 			</Grid>
 		{/if}
-		{#if uploading}
-			<Progress class="w-full my-4" size="lg" tween value={uploaded} />
-		{/if}
+		<div class="w-full">
+			{#if uploading}
+				<Flex class="w-full my-4">
+					{#if uploaded < 100}
+						<Loader size={48} class="mr-4" /> Uploading...
+					{:else}
+						<Check size={36} class="mr-4" /> Done!
+					{/if}
+				</Flex>
+				<Progress
+					class="w-full my-4"
+					size="lg"
+					tween
+					value={uploaded}
+				/>
+			{/if}
+		</div>
 	</Flex>
 </Container>
