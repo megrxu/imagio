@@ -4,7 +4,6 @@
 	import { Button } from "@svelteuidev/core";
 	import { Progress } from "@svelteuidev/core";
 	import { nanoid } from "nanoid";
-	import { upload_proxy as uploadImage } from "$lib/proxy";
 	import { Loader, Alert } from "@svelteuidev/core";
 	import { Check } from "radix-icons-svelte";
 
@@ -15,6 +14,18 @@
 	let uploaded = 0;
 	let uploadedImages: UploadResp[] = [];
 	let alert: string | null = null;
+
+	function uploadImage(image: Image): Promise<Response> {
+		let data = new FormData();
+		data.append("file", image.file);
+
+		const req = {
+			method: "POST",
+			body: data,
+		};
+
+		return fetch("/api/upload", req);
+	}
 
 	function onChange() {
 		if (files) {
