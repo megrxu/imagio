@@ -2,7 +2,7 @@
 	import { Container, Center, Grid, Flex } from "@svelteuidev/core";
 	import { Button } from "@svelteuidev/core";
 	import { Progress } from "@svelteuidev/core";
-	import type { Image } from "$lib/types";
+	import type { Image, UploadResp } from "$lib/types";
 	import { nanoid } from "nanoid";
 	import { upload_proxy as uploadImage } from "$lib/proxy";
 
@@ -11,6 +11,7 @@
 	let images: Image[] = [];
 	let uploading: Boolean = false;
 	let uploaded = 0;
+	let uploadedImages: UploadResp[] = [];
 
 	function onChange() {
 		if (files) {
@@ -38,9 +39,16 @@
 			uploading = true;
 			let uploaded_cnt = 0;
 			images.forEach(async (image: Image) => {
-				let resp = await uploadImage(image);
-				uploaded_cnt += 1;
-				uploaded = (uploaded_cnt / files.length) * 100;
+				let resp: Response = await uploadImage(image);
+				let res = await resp.text();
+				let uploadedImage: UploadResp = JSON.parse(res);
+				if (uploadedImage.success == true) {
+					uploaded_cnt += 1;
+					uploaded = (uploaded_cnt / files.length) * 100;
+					uploadedImages = [...uploadedImages, uploadedImage];
+				} else {
+					console.log(`Image ${image.file.name} did not uploaded.`);
+				}
 			});
 		}
 	}

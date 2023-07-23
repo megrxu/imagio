@@ -1,6 +1,6 @@
 import type { Image } from "$lib/types";
 
-export async function upload_proxy(image: Image) {
+export async function upload_proxy(image: Image): Promise<Response> {
     let data = new FormData();
     data.append('file', image.file);
 
@@ -9,6 +9,5 @@ export async function upload_proxy(image: Image) {
         body: data,
     }
 
-    const resp = (await fetch('/api/upload', req)).json();
-    return resp;
+    return fetch('/api/upload', req);
 }
