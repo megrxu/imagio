@@ -1,10 +1,10 @@
-# ImmI
+# `immi`
 
-ImmI is a web application that allows you to store and manage private images using [Cloudflare Images ↗](https://www.cloudflare.com/products/cloudflare-images/) and [Cloudflare Pages ↗](https://developers.cloudflare.com/pages/) with the help of [SvelteKit ↗](https://kit.svelte.dev/) framework.
+`immi` is a web application that allows you to store and manage private images using [Cloudflare Images](https://www.cloudflare.com/products/cloudflare-images/) and [Cloudflare Pages ↗](https://developers.cloudflare.com/pages/) with the help of [SvelteKit](https://kit.svelte.dev/) framework.
 
 ## Build
 
-Please note that this project requires a paid plan of [Cloudflare Images ↗](https://www.cloudflare.com/products/cloudflare-images/).
+Please note that this project requires a paid plan of [Cloudflare Images](https://www.cloudflare.com/products/cloudflare-images/).
 
 To build and deploy ImmI, follow the steps below:
 
@@ -14,7 +14,7 @@ To build and deploy ImmI, follow the steps below:
 
 ## Endpoints
 
-ImmI provides the following endpoints:
+`immi` provides the following endpoints:
 
 - POST: `/api/upload` - Use this endpoint to upload images.
 - GET: `/`, `/upload`, `/api/list` - Use these endpoints to upload and list uploaded images.
