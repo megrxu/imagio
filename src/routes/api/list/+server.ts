@@ -9,7 +9,16 @@ export async function GET({ fetch, platform }) {
                 'Authorization': `Bearer ${platform.env.CF_IMAGES_API_KEY}`
             },
         }
-        return fetch(UPLOAD_URL, req);
+        try {
+            const response = await fetch(UPLOAD_URL, req);
+            const res = await response.json();
+            return json(res)
+        } catch (error) {
+            console.log(error);
+            return json({
+                message: 'Error.'
+            })
+        }
     } else {
         return json({
             message: '401 Unauthorized.'
