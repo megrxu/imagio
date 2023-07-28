@@ -7,6 +7,7 @@ delete colors.blueGray
 delete colors.trueGray
 delete colors.coolGray
 delete colors.blueGray
+delete colors.warmGray
 
 const config = {
   darkMode: 'class',
