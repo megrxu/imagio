@@ -1,16 +1,17 @@
 <script lang="ts">
-	import { Container, Center, Flex, Grid, Button } from "@svelteuidev/core";
+	import { Center, Flex, Grid } from "@svelteuidev/core";
 	import { ActionIcon } from "@svelteuidev/core";
 	import {
 		Copy,
 		MagnifyingGlass,
 		InfoCircled,
 		Pencil2,
+		Cross2,
 	} from "radix-icons-svelte";
 	import type { UploadResResp } from "$lib/types";
 	import { onMount } from "svelte";
 	import { clipboard } from "@svelteuidev/composables";
-	import { getUUID, getVariant, listImages, imageURL } from "$lib";
+	import { getUUID, getVariant, listImages } from "$lib";
 
 	let images: UploadResResp[] = [];
 
@@ -31,19 +32,24 @@
 				/>
 			</figure>
 			<Flex align="left">
-				<ActionIcon
-					class="inline-block"
-					use={[[clipboard, getUUID(image.variants[0])]]}
-				>
+				<ActionIcon use={[[clipboard, getUUID(image.variants[0])]]}>
 					<Copy />
 				</ActionIcon>
-				<ActionIcon
-					root="a"
-					href={imageURL(image.id, "download")}
-					class="inline-block"><MagnifyingGlass /></ActionIcon
+				<ActionIcon root="a" href={`/api/images/${image.id}/blob`}>
+					<MagnifyingGlass /></ActionIcon
 				>
-				<ActionIcon class="inline-block"><InfoCircled /></ActionIcon>
-				<ActionIcon class="inline-block"><Pencil2 /></ActionIcon>
+				<ActionIcon><InfoCircled /></ActionIcon>
+				<ActionIcon root="a" href={`/images/${image.id}`}
+					><Pencil2 /></ActionIcon
+				>
+				<ActionIcon
+					on:click={async () => {
+						await fetch(`/api/images/${image.id}`, {
+							method: "DELETE",
+						});
+						images = images.filter((i) => i.id !== image.id);
+					}}><Cross2 /></ActionIcon
+				>
 			</Flex>
 		</Grid.Col>
 	{/each}

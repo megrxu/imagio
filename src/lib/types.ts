@@ -1,7 +1,6 @@
 export interface Image {
     src: string | ArrayBuffer | null;
     file: File,
-    alt: string;
 };
 
 export type CfImagesResp<Type> = {

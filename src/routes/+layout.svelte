@@ -3,7 +3,6 @@
 	import { page } from "$app/stores";
 	import "../app.css";
 	import { Container, Loader } from "@svelteuidev/core";
-	import { error } from "@sveltejs/kit";
 
 	let mounted = false;
 

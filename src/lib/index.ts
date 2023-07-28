@@ -12,7 +12,7 @@ export function getVariant(url: string, variant: string): string {
 }
 
 export async function listImages() {
-    let resp = await fetch("/api/list");
+    let resp = await fetch("/api/images");
     let imagesResp: ListResp = JSON.parse(await resp.text());
     return imagesResp.result.images;
 }
@@ -27,8 +27,4 @@ export function uploadImage(image: Image): Promise<Response> {
     };
 
     return fetch("/api/upload", req);
-}
-
-export function imageURL(id: string, action: string) {
-    return `/api/image?id=${id}&action=${action}`;
 }

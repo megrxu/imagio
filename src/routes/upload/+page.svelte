@@ -1,12 +1,10 @@
 <script lang="ts">
 	import type { Image, UploadResp } from "$lib/types";
 	import { uploadImage } from "$lib";
-	import { Container, Center, Grid, Flex, Tabs } from "@svelteuidev/core";
+	import { Center, Grid, Flex, Tabs } from "@svelteuidev/core";
 	import { Button } from "@svelteuidev/core";
-	import { Progress } from "@svelteuidev/core";
-	import { nanoid } from "nanoid";
-	import { Loader, Alert } from "@svelteuidev/core";
-	import { Check } from "radix-icons-svelte";
+	import { Alert } from "@svelteuidev/core";
+	import SubmitProgress from "../../component/widget/SubmitProgress.svelte";
 
 	let files: FileList;
 	let placeholder: Boolean = true;
@@ -27,7 +25,6 @@
 					const image: Image = {
 						src: reader.result,
 						file: file,
-						alt: nanoid(),
 					};
 					images = [...images, image];
 				});
@@ -94,21 +91,10 @@
 		{#each images as image}
 			<Grid.Col span={3}>
 				<figure>
-					<img src={String(image.src)} alt={image.alt} />
+					<img src={String(image.src)} alt="" />
 				</figure>
 			</Grid.Col>
 		{/each}
 	</Grid>
 {/if}
-<div class="w-full">
-	{#if uploading}
-		<Flex class="w-full my-4">
-			{#if uploaded < 100}
-				<Loader size={48} class="mr-4" /> Uploading...
-			{:else}
-				<Check size={24} class="mr-4" /> Done!
-			{/if}
-		</Flex>
-		<Progress class="w-full my-4" size="lg" tween value={uploaded} />
-	{/if}
-</div>
+<SubmitProgress doing={uploading} done={uploaded} />
