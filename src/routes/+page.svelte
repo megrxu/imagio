@@ -1,50 +1,50 @@
 <script lang="ts">
-	import { Container, Center, Flex, Grid } from "@svelteuidev/core";
-	import type { UploadResResp, ListResp } from "$lib/types";
+	import { Container, Center, Flex, Grid, Button } from "@svelteuidev/core";
+	import { ActionIcon } from "@svelteuidev/core";
+	import {
+		Copy,
+		MagnifyingGlass,
+		InfoCircled,
+		Pencil2,
+	} from "radix-icons-svelte";
+	import type { UploadResResp } from "$lib/types";
 	import { onMount } from "svelte";
-	import { clickToCopy } from "$lib";
+	import { clipboard } from "@svelteuidev/composables";
+	import { getUUID, getVariant, listImages, imageURL } from "$lib";
 
 	let images: UploadResResp[] = [];
 
-	async function listImages() {
-		let resp = await fetch("/api/list");
-		let imagesResp: ListResp = JSON.parse(await resp.text());
-		images = imagesResp.result.images;
-	}
-
 	onMount(async () => {
-		await listImages();
+		images = await listImages();
 	});
-
-	function getUUID(url: string): string | undefined {
-		return url.split("/").at(-2);
-	}
-
-	function getVariant(url: string, variant: string): string {
-		let segs = url.split("/");
-		segs.pop();
-		segs.push(variant);
-		return segs.join("/");
-	}
 </script>
 
-<Container class="w-2/3">
-	<Center class="m-8 text-xl font-black">Show</Center>
-	<Grid class="w-full">
-		{#each images as image}
-			<Grid.Col span={3}>
-				<figure>
-					<!-- svelte-ignore a11y-click-events-have-key-events -->
-					<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-					<img
-						class="cursor-pointer"
-						on:click={async () =>
-							await clickToCopy(getUUID(image.variants[0]))}
-						src={getVariant(image.variants[0], "square")}
-						alt={image.filename}
-					/>
-				</figure>
-			</Grid.Col>
-		{/each}
-	</Grid>
-</Container>
+<Center class="m-8 text-xl font-black">Show</Center>
+<Grid>
+	{#each images as image}
+		<Grid.Col sm={12} md={6} lg={3}>
+			<figure class="my-2">
+				<img
+					class="cursor-pointer"
+					src={getVariant(image.variants[0], "square")}
+					alt={image.filename}
+				/>
+			</figure>
+			<Flex align="left">
+				<ActionIcon
+					class="inline-block"
+					use={[[clipboard, getUUID(image.variants[0])]]}
+				>
+					<Copy />
+				</ActionIcon>
+				<ActionIcon
+					root="a"
+					href={imageURL(image.id, "download")}
+					class="inline-block"><MagnifyingGlass /></ActionIcon
+				>
+				<ActionIcon class="inline-block"><InfoCircled /></ActionIcon>
+				<ActionIcon class="inline-block"><Pencil2 /></ActionIcon>
+			</Flex>
+		</Grid.Col>
+	{/each}
+</Grid>

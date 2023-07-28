@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Image, UploadResp } from "$lib/types";
+	import { uploadImage } from "$lib";
 	import { Container, Center, Grid, Flex, Tabs } from "@svelteuidev/core";
 	import { Button } from "@svelteuidev/core";
 	import { Progress } from "@svelteuidev/core";
@@ -14,18 +15,6 @@
 	let uploaded = 0;
 	let uploadedImages: UploadResp[] = [];
 	let alert: string | null = null;
-
-	function uploadImage(image: Image): Promise<Response> {
-		let data = new FormData();
-		data.append("file", image.file);
-
-		const req = {
-			method: "POST",
-			body: data,
-		};
-
-		return fetch("/api/upload", req);
-	}
 
 	function onChange() {
 		if (files) {
@@ -67,70 +56,59 @@
 	}
 </script>
 
-<Container class="w-2/3">
-	<Flex class="h-screen" justify="center" align="center" direction="column">
-		<Center class="m-8 text-xl font-black">Upload Images</Center>
-		{#if alert}
-			<Alert title="Alert!">
-				{alert}
-			</Alert>
-		{/if}
-		<Flex class="m-8" justify="center" align="center" gap="xl">
-			<Button ripple class="p-0">
-				<input
-					multiple
-					class="hidden"
-					type="file"
-					bind:files
-					on:change={onChange}
-					id="uploads"
-					accept="image/png, image/jpeg, image/gif"
-				/>
-				<label for="uploads" class="w-full cursor-pointer">Select</label
-				>
-			</Button>
-			<Button type="submit" color="teal" ripple on:click={doUpload}
-				>Upload</Button
-			>
+<Center class="m-8 text-xl font-black">Upload Images</Center>
+{#if alert}
+	<Alert title="Alert!">
+		{alert}
+	</Alert>
+{/if}
+<Flex class="m-8" justify="center" align="center" gap="xl">
+	<Button ripple class="p-0">
+		<input
+			multiple
+			class="hidden"
+			type="file"
+			bind:files
+			on:change={onChange}
+			id="uploads"
+			accept="image/png, image/jpeg, image/gif"
+		/>
+		<label for="uploads" class="w-full cursor-pointer">Select</label>
+	</Button>
+	<Button type="submit" color="teal" ripple on:click={doUpload}>Upload</Button
+	>
+</Flex>
+{#if placeholder}
+	<label for="uploads" class="h-96 w-full">
+		<Flex
+			class="h-96 w-full border-dashed border-zinc-300 border-2 rounded-lg text-lg text-slate-300"
+			justify="center"
+			align="center"
+			direction="column"
+		>
+			Image Placeholder
 		</Flex>
-		{#if placeholder}
-			<label for="uploads" class="h-96 w-full">
-				<Flex
-					class="h-96 w-full border-dashed border-zinc-300 border-2 rounded-lg text-lg text-slate-300"
-					justify="center"
-					align="center"
-					direction="column"
-				>
-					Image Placeholder
-				</Flex>
-			</label>
-		{:else}
-			<Grid class="h-96 w-full overflow-y-auto ">
-				{#each images as image}
-					<Grid.Col span={3}>
-						<figure>
-							<img src={String(image.src)} alt={image.alt} />
-						</figure>
-					</Grid.Col>
-				{/each}
-			</Grid>
-		{/if}
-		<div class="w-full">
-			{#if uploading}
-				<Flex class="w-full my-4">
-					{#if uploaded < 100}
-						<Loader size={48} class="mr-4" /> Uploading...
-					{:else}
-						<Check size={24} class="mr-4" /> Done!
-					{/if}
-				</Flex>
-				<Progress
-					class="w-full my-4"
-					size="lg"
-					tween
-					value={uploaded}
-				/>
+	</label>
+{:else}
+	<Grid class="h-96 w-full overflow-y-auto ">
+		{#each images as image}
+			<Grid.Col span={3}>
+				<figure>
+					<img src={String(image.src)} alt={image.alt} />
+				</figure>
+			</Grid.Col>
+		{/each}
+	</Grid>
+{/if}
+<div class="w-full">
+	{#if uploading}
+		<Flex class="w-full my-4">
+			{#if uploaded < 100}
+				<Loader size={48} class="mr-4" /> Uploading...
+			{:else}
+				<Check size={24} class="mr-4" /> Done!
 			{/if}
-		</div>
-	</Flex>
-</Container>
+		</Flex>
+		<Progress class="w-full my-4" size="lg" tween value={uploaded} />
+	{/if}
+</div>
