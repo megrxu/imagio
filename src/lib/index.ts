@@ -1,4 +1,4 @@
-import type { ListResp, Image } from "./types";
+import type { Image } from "./types";
 
 export function getUUID(url: string): string | undefined {
     return url.split("/").at(-2);
@@ -11,12 +11,6 @@ export function getVariant(url: string, variant: string): string {
     return segs.join("/");
 }
 
-export async function listImages() {
-    let resp = await fetch("/api/images");
-    let imagesResp: ListResp = JSON.parse(await resp.text());
-    return imagesResp.result.images;
-}
-
 export function uploadImage(image: Image): Promise<Response> {
     let data = new FormData();
     data.append("file", image.file);
@@ -26,5 +20,5 @@ export function uploadImage(image: Image): Promise<Response> {
         body: data,
     };
 
-    return fetch("/api/upload", req);
+    return fetch("/upload", req);
 }

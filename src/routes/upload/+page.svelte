@@ -53,7 +53,7 @@
 	}
 </script>
 
-<Center class="m-8 text-xl font-black">Upload Images</Center>
+<Center class="m-8 text-xl font-black">Upload</Center>
 {#if alert}
 	<Alert title="Alert!">
 		{alert}
@@ -83,7 +83,7 @@
 			align="center"
 			direction="column"
 		>
-			Image Placeholder
+			Images Placeholder
 		</Flex>
 	</label>
 {:else}

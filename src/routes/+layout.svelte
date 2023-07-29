@@ -2,7 +2,7 @@
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
 	import "../app.css";
-	import { Container, Loader } from "@svelteuidev/core";
+	import { Center, Container, Footer, Loader } from "@svelteuidev/core";
 
 	let mounted = false;
 
@@ -21,6 +21,9 @@
 	{:else}
 		<Container class="md:w-2/3 w-full mx-4">
 			<slot />
+			<Footer height={20}>
+				<Center>Imageio</Center>
+			</Footer>
 		</Container>
 	{/if}
 {:else}

@@ -8,19 +8,16 @@
 		Pencil2,
 		Cross2,
 	} from "radix-icons-svelte";
-	import type { UploadResResp } from "$lib/types";
-	import { onMount } from "svelte";
 	import { clipboard } from "@svelteuidev/composables";
-	import { getUUID, getVariant, listImages } from "$lib";
+	import { getUUID, getVariant } from "$lib";
+	import type { PageData } from "./$types";
 
-	let images: UploadResResp[] = [];
+	export let data: PageData;
 
-	onMount(async () => {
-		images = await listImages();
-	});
+	$: ({ images } = data);
 </script>
 
-<Center class="m-8 text-xl font-black">Show</Center>
+<Center class="m-8 text-xl font-black">Images</Center>
 <Grid>
 	{#each images as image}
 		<Grid.Col sm={12} md={6} lg={3}>
@@ -35,7 +32,7 @@
 				<ActionIcon use={[[clipboard, getUUID(image.variants[0])]]}>
 					<Copy />
 				</ActionIcon>
-				<ActionIcon root="a" href={`/api/images/${image.id}/blob`}>
+				<ActionIcon root="a" href={`/images/${image.id}/blob`}>
 					<MagnifyingGlass /></ActionIcon
 				>
 				<ActionIcon><InfoCircled /></ActionIcon>
@@ -44,7 +41,7 @@
 				>
 				<ActionIcon
 					on:click={async () => {
-						await fetch(`/api/images/${image.id}`, {
+						await fetch(`/images/${image.id}`, {
 							method: "DELETE",
 						});
 						images = images.filter((i) => i.id !== image.id);

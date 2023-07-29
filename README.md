@@ -1,4 +1,4 @@
-# `imagio`
+# `imagio` (WIP)
 
 `imagio` is a web application that allows you to store and manage private images using [Cloudflare Images](https://www.cloudflare.com/products/cloudflare-images/) and [Cloudflare Pages ↗](https://developers.cloudflare.com/pages/) with the help of [SvelteKit](https://kit.svelte.dev/) framework.
 
@@ -16,5 +16,5 @@ To build and deploy imagio, follow the steps below:
 
 `imagio` provides the following endpoints:
 
-- POST: `/api/upload` - Use this endpoint to upload images.
-- GET: `/`, `/upload`, `/api/list` - Use these endpoints to upload and list uploaded images.
+- `/upload`: to upload images.
+- `/images`: to list and modify uploaded images.
