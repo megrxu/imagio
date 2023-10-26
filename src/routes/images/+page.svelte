@@ -23,7 +23,7 @@
 			<figure class="my-2">
 				<img
 					class="cursor-pointer"
-					src={`/delivery/images/${image_id}/square`}
+					src={`/delivery/${image_id}/square`}
 					alt={image_id}
 				/>
 			</figure>

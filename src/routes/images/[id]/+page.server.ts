@@ -1,5 +1,5 @@
 import type { PageServerLoad } from './$types';
-import type { ListResp, UploadResResp, UploadResp } from "$lib/types";
+import type { UploadResResp, UploadResp } from "$lib/types";
 
 export const load: PageServerLoad = async ({ fetch, platform, params: { id } }) => {
 	let image: UploadResResp | undefined = undefined;

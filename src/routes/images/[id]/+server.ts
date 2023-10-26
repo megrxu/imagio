@@ -7,6 +7,9 @@ export async function DELETE({ fetch, platform, params: { id } }) {
                 'Authorization': `Bearer ${platform.env.CF_IMAGES_API_KEY}`
             },
         };
-        return fetch(ENDPOINT, req);
+        const prefix = await platform.env.IMAGIO_KV.get(id)
+        await platform.env.IMAGIO_KV.delete(`${prefix}:${id}`)
+        await platform.env.IMAGIO_KV.delete(id)
+        return fetch(ENDPOINT, req)
     }
 }

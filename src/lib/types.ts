@@ -6,7 +6,6 @@ export interface Image {
 export interface ImageValue {
     id: string,
     namespace: string,
-    meta: object
 }
 
 export type CfImagesResp<Type> = {

@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ fetch, platform }) => {
             limit: 24,
         })
         image_ids = keysResp.keys.map(function (key) {
-            return key.name.split(':')[1]
+            return key.name.split(':')[2]
         })
     }
     return {
