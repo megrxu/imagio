@@ -1,6 +1,6 @@
 # `imagio` (WIP)
 
-`imagio` is a web application that allows you to store and manage private images using [Cloudflare Images](https://www.cloudflare.com/products/cloudflare-images/) and [Cloudflare Pages ↗](https://developers.cloudflare.com/pages/) with the help of [SvelteKit](https://kit.svelte.dev/) framework.
+`imagio` is a web application that allows you to store and manage private images using [Cloudflare Images](https://www.cloudflare.com/products/cloudflare-images/) and [Cloudflare Pages](https://developers.cloudflare.com/pages/) with the help of [SvelteKit](https://kit.svelte.dev/) framework.
 
 ## Build
 

@@ -1,12 +1,15 @@
 <script lang="ts">
 	import type { Image, UploadResp } from "$lib/types";
 	import { uploadImage } from "$lib";
-	import { Center, Grid, Flex, Tabs } from "@svelteuidev/core";
+	import { Center, Grid, Flex } from "@svelteuidev/core";
 	import { Button } from "@svelteuidev/core";
 	import { Alert } from "@svelteuidev/core";
+	import { NativeSelect } from "@svelteuidev/core";
 	import SubmitProgress from "../../component/widget/SubmitProgress.svelte";
+	import { json } from "@sveltejs/kit";
 
 	let files: FileList;
+	let namespace: string;
 	let placeholder: Boolean = true;
 	let images: Image[] = [];
 	let uploading: Boolean = false;
@@ -45,6 +48,15 @@
 					uploaded_cnt += 1;
 					uploaded = (uploaded_cnt / files.length) * 100;
 					uploadedImages = [...uploadedImages, uploadedImage];
+					// Update the KV
+					await fetch("/upload", {
+						method: "PUT",
+						body: JSON.stringify({
+							id: uploadedImage.result.id,
+							namespace: namespace,
+							meta: uploadedImage.result.meta,
+						}),
+					});
 				} else {
 					alert = `Image ${image.file.name} did not uploaded.`;
 				}
@@ -59,6 +71,12 @@
 		{alert}
 	</Alert>
 {/if}
+<NativeSelect
+	data={["public", "private"]}
+	placeholder="public"
+	label="Namespace"
+	bind:value={namespace}
+/>
 <Flex class="m-8" justify="center" align="center" gap="xl">
 	<Button ripple class="p-0">
 		<input

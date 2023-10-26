@@ -3,6 +3,12 @@ export interface Image {
     file: File,
 };
 
+export interface ImageValue {
+    id: string,
+    namespace: string,
+    meta: object
+}
+
 export type CfImagesResp<Type> = {
     success: Boolean,
     errors: object[],
