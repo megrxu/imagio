@@ -18,7 +18,13 @@ export async function POST({ fetch, request, platform }) {
 export async function PUT({ request, platform }) {
     if (platform) {
         const data: ImageValue = await request.json()
-        await platform.env.IMAGIO_KV.put(`${data.namespace}:${data.id}`, JSON.stringify(data.meta))
+        let meta;
+        if (data.meta == undefined || data.meta == null) {
+            meta = {}
+        } else {
+            meta = data.meta
+        }
+        await platform.env.IMAGIO_KV.put(`${data.namespace}:${data.id}`, JSON.stringify(meta))
         return new Response();
     }
 }

@@ -11,7 +11,8 @@ declare global {
 			env: {
 				CF_IMAGES_API_KEY: string,
 				ACCOUNT_ID: string,
-				IMAGIO_KV: KVNamespace
+				IMAGIO_KV: KVNamespace,
+				ACCOUNT_HASH: string
 			}
 		}
 	}

@@ -6,7 +6,6 @@
 	import { Alert } from "@svelteuidev/core";
 	import { NativeSelect } from "@svelteuidev/core";
 	import SubmitProgress from "../../component/widget/SubmitProgress.svelte";
-	import { json } from "@sveltejs/kit";
 
 	let files: FileList;
 	let namespace: string;

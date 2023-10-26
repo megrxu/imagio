@@ -1,21 +1,17 @@
 import type { PageServerLoad } from './$types';
-import type { ListResp, UploadResResp } from "$lib/types";
 
-export const load: PageServerLoad = async ({ fetch, platform, locals }) => {
-    let images: UploadResResp[] = [];
+export const load: PageServerLoad = async ({ fetch, platform }) => {
+    let image_ids: string[] = [];
     if (platform) {
-        const ENDPOINT = `https://api.cloudflare.com/client/v4/accounts/${platform.env.ACCOUNT_ID}/images/v1?per_page=24`
-        const req = {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${platform.env.CF_IMAGES_API_KEY}`
-            },
-        }
-        const resp = await fetch(ENDPOINT, req);
-        let imagesResp: ListResp = JSON.parse(await resp.text());
-        images = imagesResp.result.images;
+        let keysResp = await platform.env.IMAGIO_KV.list({
+            prefix: 'public:',
+            limit: 24,
+        })
+        image_ids = keysResp.keys.map(function (key) {
+            return key.name.split(':')[1]
+        })
     }
     return {
-        images: images
+        image_ids: image_ids
     }
 }

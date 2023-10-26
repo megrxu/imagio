@@ -9,42 +9,41 @@
 		Cross2,
 	} from "radix-icons-svelte";
 	import { clipboard } from "@svelteuidev/composables";
-	import { getUUID, getVariant } from "$lib";
 	import type { PageData } from "./$types";
 
 	export let data: PageData;
 
-	$: ({ images } = data);
+	$: ({ image_ids } = data);
 </script>
 
 <Center class="m-8 text-xl font-black">Images</Center>
 <Grid>
-	{#each images as image}
+	{#each image_ids as image_id}
 		<Grid.Col sm={12} md={6} lg={3}>
 			<figure class="my-2">
 				<img
 					class="cursor-pointer"
-					src={getVariant(image.variants[0], "square")}
-					alt={image.filename}
+					src={`/delivery/images/${image_id}/square`}
+					alt={image_id}
 				/>
 			</figure>
 			<Flex align="left">
-				<ActionIcon use={[[clipboard, getUUID(image.variants[0])]]}>
+				<ActionIcon use={[[clipboard, image_id]]}>
 					<Copy />
 				</ActionIcon>
-				<ActionIcon root="a" href={`/images/${image.id}/blob`}>
+				<ActionIcon root="a" href={`/images/${image_id}/blob`}>
 					<MagnifyingGlass /></ActionIcon
 				>
 				<ActionIcon><InfoCircled /></ActionIcon>
-				<ActionIcon root="a" href={`/images/${image.id}`}
+				<ActionIcon root="a" href={`/images/${image_id}`}
 					><Pencil2 /></ActionIcon
 				>
 				<ActionIcon
 					on:click={async () => {
-						await fetch(`/images/${image.id}`, {
+						await fetch(`/images/${image_id}`, {
 							method: "DELETE",
 						});
-						images = images.filter((i) => i.id !== image.id);
+						image_ids = image_ids.filter((i) => i !== image_id);
 					}}><Cross2 /></ActionIcon
 				>
 			</Flex>
