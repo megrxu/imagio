@@ -1,6 +1,13 @@
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ fetch, platform, url }) => {
+    let category: string = url.searchParams.get('category') ?? 'public'
+    if (category != 'public') {
+        let credential: string = url.searchParams.get('credential') ?? ""
+        if (credential != platform?.env.CREDENTIAL) {
+            category = 'public'
+        }
+    }
     let page: number = parseInt(url.searchParams.get('page') ?? '1');
     let per_page: number = parseInt(url.searchParams.get('per_page') ?? '24');
     let skip = (page - 1) * per_page
@@ -11,7 +18,7 @@ export const load: PageServerLoad = async ({ fetch, platform, url }) => {
     if (platform) {
         const { results } = await platform.env.IMAGIO_DB.prepare(`
             select uuid from images where category = ? order by create_time desc limit ?, ?
-        `).bind('public', skip, per_page).all()
+        `).bind(category, skip, per_page).all()
         image_ids = results.map(function (key: Record<string, unknown>) {
             return `${key['uuid']}`
         })
