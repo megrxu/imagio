@@ -1,0 +1,27 @@
+{
+    "page": {
+        "upload": {
+            "title": "上传",
+            "upload": "上传",
+            "select": "选择",
+            "images_placeholder": "图片占位符",
+            "images_upload_failed": "图片 {name} 未能上传成功。"
+        },
+        "images": {
+            "title": "图片集"
+        },
+        "image": {
+            "edit": {
+                "title": "编辑"
+            }
+        }
+    },
+    "term": {
+        "category": "类别"
+    },
+    "general": {
+        "notification": {
+            "alert": "注意！"
+        }
+    }
+}

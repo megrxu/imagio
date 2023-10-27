@@ -10,13 +10,14 @@
 	} from "radix-icons-svelte";
 	import { clipboard } from "@svelteuidev/composables";
 	import type { PageData } from "./$types";
+	import { _ } from "svelte-i18n";
 
 	export let data: PageData;
 
 	$: ({ image_ids } = data);
 </script>
 
-<Center class="m-8 text-xl font-black">Images</Center>
+<Center class="m-8 text-xl font-black">{$_('page.images.title')}</Center>
 <Grid>
 	{#each image_ids as image_id}
 		<Grid.Col sm={12} md={6} lg={3}>

@@ -6,6 +6,7 @@
 	import { Alert } from "@svelteuidev/core";
 	import { NativeSelect } from "@svelteuidev/core";
 	import SubmitProgress from "../../component/widget/SubmitProgress.svelte";
+	import { _ } from "svelte-i18n";
 
 	let files: FileList;
 	let namespace: string = "public";
@@ -57,14 +58,16 @@
 						}),
 					});
 				} else {
-					alert = `Image ${image.file.name} did not uploaded.`;
+					alert = $_("page.upload.images_upload_failed", {
+						values: { name: image.file.name },
+					});
 				}
 			});
 		}
 	}
 </script>
 
-<Center class="m-8 text-xl font-black">Upload</Center>
+<Center class="m-8 text-xl font-black">{$_("page.upload.upload")}</Center>
 {#if alert}
 	<Alert title="Alert!">
 		{alert}
@@ -73,7 +76,7 @@
 <NativeSelect
 	data={["public", "private"]}
 	placeholder={namespace}
-	label="Namespace"
+	label={$_("term.category")}
 	bind:value={namespace}
 />
 <Flex class="m-8" justify="center" align="center" gap="xl">
@@ -87,9 +90,12 @@
 			id="uploads"
 			accept="image/png, image/jpeg, image/gif"
 		/>
-		<label for="uploads" class="w-full cursor-pointer">Select</label>
+		<label for="uploads" class="w-full cursor-pointer"
+			>{$_("page.upload.select")}</label
+		>
 	</Button>
-	<Button type="submit" color="teal" ripple on:click={doUpload}>Upload</Button
+	<Button type="submit" color="teal" ripple on:click={doUpload}
+		>{$_("page.upload.upload")}</Button
 	>
 </Flex>
 {#if placeholder}
@@ -100,7 +106,7 @@
 			align="center"
 			direction="column"
 		>
-			Images Placeholder
+			{$_("page.upload.images_placeholder")}
 		</Flex>
 	</label>
 {:else}
