@@ -19,8 +19,9 @@ export async function PUT({ request, platform }) {
     if (platform) {
         const data: ImageValue = await request.json()
         const timestamp = Date.now()
-        await platform.env.IMAGIO_KV.put(data.id, `${data.namespace}:${timestamp}`)
-        await platform.env.IMAGIO_KV.put(`${data.namespace}:${timestamp}:${data.id}`, "")
+        await platform.env.IMAGIO_DB.prepare(`
+            insert into images (uuid, category, create_time) values (?, ?, ?)
+        `).bind(data.id, data.namespace, timestamp).run()
         return new Response();
     }
 }

@@ -13,6 +13,7 @@ declare global {
 				ACCOUNT_ID: string,
 				IMAGIO_KV: KVNamespace,
 				ACCOUNT_HASH: string
+				IMAGIO_DB: D1Database,
 			}
 		}
 	}

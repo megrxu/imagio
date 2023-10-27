@@ -11,7 +11,9 @@
     {#if doing}
         <Flex class="w-full my-4">
             {#if done < 100}
-                <Loader size={48} class="mr-4" />{action}({done}/100)
+                <Loader size={48} class="mr-4" />{action}({Math.round(
+                    done * 100
+                ) / 100}/100)
             {:else}
                 <Check size={24} class="mr-4" />{action_done}
             {/if}

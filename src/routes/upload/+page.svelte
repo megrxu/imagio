@@ -8,7 +8,7 @@
 	import SubmitProgress from "../../component/widget/SubmitProgress.svelte";
 
 	let files: FileList;
-	let namespace: string;
+	let namespace: string = "public";
 	let placeholder: Boolean = true;
 	let images: Image[] = [];
 	let uploading: Boolean = false;
@@ -47,7 +47,7 @@
 					uploaded_cnt += 1;
 					uploaded = (uploaded_cnt / files.length) * 100;
 					uploadedImages = [...uploadedImages, uploadedImage];
-					// Update the KV
+					// Update the database
 					await fetch("/upload", {
 						method: "PUT",
 						body: JSON.stringify({
@@ -72,7 +72,7 @@
 {/if}
 <NativeSelect
 	data={["public", "private"]}
-	placeholder="public"
+	placeholder={namespace}
 	label="Namespace"
 	bind:value={namespace}
 />
