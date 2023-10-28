@@ -9,7 +9,7 @@
 	import { _ } from "svelte-i18n";
 
 	let files: FileList;
-	let namespace: string = "public";
+	let category: string = "public";
 	let placeholder: Boolean = true;
 	let images: Image[] = [];
 	let uploading: Boolean = false;
@@ -53,8 +53,7 @@
 						method: "PUT",
 						body: JSON.stringify({
 							id: uploadedImage.result.id,
-							namespace: namespace,
-							phash: "aaa",
+							category: category,
 						}),
 					});
 				} else {
@@ -75,9 +74,9 @@
 {/if}
 <NativeSelect
 	data={["public", "private"]}
-	placeholder={namespace}
+	placeholder={category}
 	label={$_("term.category")}
-	bind:value={namespace}
+	bind:value={category}
 />
 <Flex class="m-8" justify="center" align="center" gap="xl">
 	<Button ripple class="p-0">
