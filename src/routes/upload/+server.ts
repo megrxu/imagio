@@ -1,4 +1,4 @@
-import type { ImageValue } from "$lib/types";
+import type { ImageAssocData } from "$lib/types";
 
 export async function POST({ fetch, request, platform }) {
     if (platform) {
@@ -17,11 +17,11 @@ export async function POST({ fetch, request, platform }) {
 
 export async function PUT({ request, platform }) {
     if (platform) {
-        const data: ImageValue = await request.json()
+        const data: ImageAssocData = await request.json()
         const timestamp = Date.now()
         await platform.env.IMAGIO_DB.prepare(`
             insert into images (uuid, category, create_time) values (?, ?, ?)
-        `).bind(data.id, data.namespace, timestamp).run()
+        `).bind(data.id, data.category, timestamp).run()
         return new Response();
     }
 }

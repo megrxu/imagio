@@ -3,9 +3,15 @@ export interface Image {
     file: File,
 };
 
-export interface ImageValue {
+export interface ImageAssocData {
     id: string,
-    namespace: string,
+    category: string,
+    meta?: ImageMetaData
+}
+
+export interface ImageMetaData {
+    tags: string[],
+    category?: string
 }
 
 export type CfImagesResp<Type> = {
@@ -17,7 +23,7 @@ export type CfImagesResp<Type> = {
 export interface UploadResResp {
     filename: string,
     id: string,
-    meta: object,
+    meta: ImageMetaData,
     uploaded: string,
     variants: string[]
 }

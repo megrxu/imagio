@@ -54,7 +54,7 @@
 						body: JSON.stringify({
 							id: uploadedImage.result.id,
 							namespace: namespace,
-							meta: uploadedImage.result.meta,
+							phash: "aaa",
 						}),
 					});
 				} else {

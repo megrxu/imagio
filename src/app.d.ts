@@ -1,5 +1,6 @@
 // See https://kit.svelte.dev/docs/types#app
 // for information about these interfaces
+
 declare global {
 	namespace App {
 		// interface Error {}
@@ -12,6 +13,7 @@ declare global {
 				CF_IMAGES_API_KEY: string,
 				ACCOUNT_ID: string,
 				ACCOUNT_HASH: string
+				CF_ACCESS_ENDPOINT: string,
 				IMAGIO_DB: D1Database,
 				CREDENTIAL: string
 			}

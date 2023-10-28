@@ -8,16 +8,31 @@
             "images_upload_failed": "图片 {name} 未能上传成功。"
         },
         "images": {
-            "title": "图片集"
+            "title": "图片集",
+            "batch_delete": "删除选中的全部",
+            "batch_edit": "批量编辑",
+            "action": {
+                "check": "选择",
+                "edit": "编辑",
+                "delete": "删除",
+                "copy_id": "拷贝 ID",
+                "view": "详情",
+                "blob": "查看原图"
+            }
         },
         "image": {
             "edit": {
-                "title": "编辑"
+                "title": "编辑",
+                "do_edit": "应用修改"
+            },
+            "view": {
+                "title": "查看"
             }
         }
     },
     "term": {
-        "category": "类别"
+        "category": "类别",
+        "tag": "标签"
     },
     "general": {
         "notification": {

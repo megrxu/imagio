@@ -1,7 +1,7 @@
-import type { PageServerLoad } from './$types';
+import type { LayoutServerLoad } from './$types';
 import type { UploadResResp, UploadResp } from "$lib/types";
 
-export const load: PageServerLoad = async ({ fetch, platform, params: { id } }) => {
+export const load: LayoutServerLoad = async ({ fetch, platform, params: { id } }) => {
 	let image: UploadResResp | undefined = undefined;
 	if (platform) {
 		const ENDPOINT = `https://api.cloudflare.com/client/v4/accounts/${platform.env.ACCOUNT_ID}/images/v1/${id}`

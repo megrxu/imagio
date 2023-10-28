@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config}*/
 
 const colors = require('tailwindcss/colors')
+const plugin = require('tailwindcss/plugin')
 
 delete colors.lightBlue
 delete colors.blueGray
@@ -24,6 +25,9 @@ const config = {
     },
   },
   plugins: [
+    plugin(function ({ addVariant }) {
+      addVariant('child', '& > *');
+    })
   ]
 };
 
