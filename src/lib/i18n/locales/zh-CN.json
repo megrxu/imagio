@@ -23,7 +23,9 @@
         "image": {
             "edit": {
                 "title": "编辑",
-                "do_edit": "应用修改"
+                "do_edit": "应用修改",
+                "edit_error": "修改图片出错。",
+                "edit_ok": "修改成功！"
             },
             "view": {
                 "title": "查看"
@@ -32,7 +34,8 @@
     },
     "term": {
         "category": "类别",
-        "tag": "标签"
+        "tag": "标签",
+        "gallery": "图片集"
     },
     "general": {
         "notification": {

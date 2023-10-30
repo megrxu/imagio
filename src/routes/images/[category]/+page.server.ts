@@ -1,13 +1,6 @@
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ fetch, platform, url }) => {
-    let category: string = url.searchParams.get('category') ?? 'public'
-    if (category != 'public') {
-        let credential: string = url.searchParams.get('credential') ?? ""
-        if (credential != platform?.env.CREDENTIAL) {
-            category = 'public'
-        }
-    }
+export const load: PageServerLoad = async ({ platform, url, params: { category } }) => {
     let page: number = parseInt(url.searchParams.get('page') ?? '1');
     let per_page: number = parseInt(url.searchParams.get('per_page') ?? '24');
     let skip = (page - 1) * per_page
@@ -24,6 +17,9 @@ export const load: PageServerLoad = async ({ fetch, platform, url }) => {
         })
     }
     return {
-        image_ids: image_ids
+        category: category,
+        image_ids: image_ids,
+        path: url.pathname,
+        page: page
     }
 }

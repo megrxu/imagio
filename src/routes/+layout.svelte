@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { onMount, setContext } from "svelte";
 	import { page } from "$app/stores";
-	import type { LayoutServerData } from "./$types";
-	import { writable } from "svelte/store";
 	import "../app.css";
 	import { Box, Center, Container, Footer, Loader } from "@svelteuidev/core";
 

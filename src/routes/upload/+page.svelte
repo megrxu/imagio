@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Image, UploadResp } from "$lib/types";
+	import type { Image, UploadResp as CfImageResp } from "$lib/types";
 	import { uploadImage } from "$lib";
 	import { Center, Grid, Flex } from "@svelteuidev/core";
 	import { Button } from "@svelteuidev/core";
@@ -14,7 +14,7 @@
 	let images: Image[] = [];
 	let uploading: Boolean = false;
 	let uploaded = 0;
-	let uploadedImages: UploadResp[] = [];
+	let uploadedImages: CfImageResp[] = [];
 	let alert: string | null = null;
 
 	function onChange() {
@@ -43,7 +43,7 @@
 			images.forEach(async (image: Image) => {
 				let resp: Response = await uploadImage(image);
 				let res = await resp.text();
-				let uploadedImage: UploadResp = JSON.parse(res);
+				let uploadedImage: CfImageResp = JSON.parse(res);
 				if (uploadedImage.success == true) {
 					uploaded_cnt += 1;
 					uploaded = (uploaded_cnt / files.length) * 100;
@@ -60,8 +60,11 @@
 					alert = $_("page.upload.images_upload_failed", {
 						values: { name: image.file.name },
 					});
+					uploading = false;
+					return;
 				}
 			});
+			uploading = false;
 		}
 	}
 </script>
@@ -93,6 +96,9 @@
 			>{$_("page.upload.select")}</label
 		>
 	</Button>
+	<Button ripple href={`/images/${category}`}
+		>{$_("term.gallery")}</Button
+	>
 	<Button type="submit" color="teal" ripple on:click={doUpload}
 		>{$_("page.upload.upload")}</Button
 	>

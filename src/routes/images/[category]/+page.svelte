@@ -19,7 +19,8 @@
 	import { clipboard } from "@svelteuidev/composables";
 	import type { PageServerData } from "./$types";
 	import { _ } from "svelte-i18n";
-	import EditMeta from "../../component/widget/EditMeta.svelte";
+	import EditMeta from "../../../component/widget/EditMeta.svelte";
+	import Pagination from "../../../component/widget/Pagination.svelte";
 
 	let checked_ids: Record<string, boolean> = {};
 
@@ -29,15 +30,15 @@
 		checked_ids[id] = false;
 	});
 
-	$: ({ image_ids } = data);
+	$: ({ image_ids, category, path, page } = data);
 
-	let meta = {
-		category: "private",
+	$: meta = {
+		category: category,
 		tags: [],
 	};
 
 	const doEdit = async (image_id: string) => {
-		fetch(`./images/${image_id}/edit`, {
+		fetch(`./${category}/${image_id}/edit`, {
 			method: "PATCH",
 			body: JSON.stringify(meta),
 		}).then((response) => {
@@ -50,21 +51,7 @@
 
 <EditMeta {meta} />
 <Flex class="m-8" justify="center" align="center" gap="xl">
-	<Button
-		type="submit"
-		color="red"
-		ripple
-		on:click={() => {
-			image_ids.forEach(async (image_id) => {
-				if (checked_ids[image_id]) {
-					await fetch(`/images/${image_id}`, {
-						method: "DELETE",
-					});
-					image_ids = image_ids.filter((i) => i !== image_id);
-				}
-			});
-		}}>{$_("page.images.batch_delete")}</Button
-	>
+	<Button ripple href="/upload">{$_("page.upload.upload")}</Button>
 	<Button
 		type="submit"
 		ripple
@@ -76,7 +63,23 @@
 			});
 		}}>{$_("page.images.batch_edit")}</Button
 	>
+	<Button
+		type="submit"
+		color="red"
+		ripple
+		on:click={() => {
+			image_ids.forEach(async (image_id) => {
+				if (checked_ids[image_id]) {
+					await fetch(`./${category}/${image_id}`, {
+						method: "DELETE",
+					});
+					image_ids = image_ids.filter((i) => i !== image_id);
+				}
+			});
+		}}>{$_("page.images.batch_delete")}</Button
+	>
 </Flex>
+<Pagination {path} {page} />
 <Grid>
 	{#each image_ids as image_id}
 		<Grid.Col sm={12} md={6} lg={3}>
@@ -115,7 +118,10 @@
 					position="bottom"
 					label={$_("page.images.action.blob")}
 				>
-					<ActionIcon root="a" href={`/images/${image_id}/blob`}>
+					<ActionIcon
+						root="a"
+						href={`./${category}/${image_id}/blob`}
+					>
 						<MagnifyingGlass /></ActionIcon
 					></Tooltip
 				>
@@ -123,7 +129,7 @@
 					position="bottom"
 					label={$_("page.images.action.view")}
 				>
-					<ActionIcon root="a" href={`/images/${image_id}`}
+					<ActionIcon root="a" href={`./${category}/${image_id}`}
 						><InfoCircled /></ActionIcon
 					></Tooltip
 				>
@@ -131,7 +137,7 @@
 					position="bottom"
 					label={$_("page.images.action.edit")}
 				>
-					<ActionIcon root="a" href={`/images/${image_id}/edit`}
+					<ActionIcon root="a" href={`./${category}/${image_id}/edit`}
 						><Pencil2 /></ActionIcon
 					></Tooltip
 				>
@@ -141,7 +147,7 @@
 				>
 					<ActionIcon
 						on:click={async () => {
-							await fetch(`/images/${image_id}`, {
+							await fetch(`./${category}/${image_id}`, {
 								method: "DELETE",
 							});
 							image_ids = image_ids.filter((i) => i !== image_id);
