@@ -26,11 +26,11 @@
 
 	export let data: PageServerData;
 
-	data.image_ids.forEach((id) => {
-		checked_ids[id] = false;
+	data.remote_images.forEach((remote_image) => {
+		checked_ids[remote_image.uuid] = false;
 	});
 
-	$: ({ image_ids, category, path, page } = data);
+	$: ({ remote_images, page, category, path } = data);
 
 	$: meta = {
 		category: category,
@@ -56,9 +56,9 @@
 		type="submit"
 		ripple
 		on:click={() => {
-			image_ids.forEach(async (image_id) => {
-				if (checked_ids[image_id]) {
-					await doEdit(image_id);
+			remote_images.forEach(async (remote_image) => {
+				if (checked_ids[remote_image.uuid]) {
+					await doEdit(remote_image.uuid);
 				}
 			});
 		}}>{$_("page.images.batch_edit")}</Button
@@ -68,12 +68,14 @@
 		color="red"
 		ripple
 		on:click={() => {
-			image_ids.forEach(async (image_id) => {
-				if (checked_ids[image_id]) {
-					await fetch(`./${category}/${image_id}`, {
+			remote_images.forEach(async (remote_image) => {
+				if (checked_ids[remote_image.uuid]) {
+					await fetch(`./${category}/${remote_image.uuid}`, {
 						method: "DELETE",
 					});
-					image_ids = image_ids.filter((i) => i !== image_id);
+					remote_images = remote_images.filter(
+						(image) => image.uuid !== remote_image.uuid,
+					);
 				}
 			});
 		}}>{$_("page.images.batch_delete")}</Button
@@ -81,36 +83,38 @@
 </Flex>
 <Pagination {path} {page} />
 <Grid>
-	{#each image_ids as image_id}
+	{#each remote_images as remote_image}
 		<Grid.Col sm={12} md={6} lg={3}>
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
 			<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 			<figure
 				class="my-2"
 				on:click={() => {
-					checked_ids[image_id] = !checked_ids[image_id];
+					checked_ids[remote_image.uuid] =
+						!checked_ids[remote_image.uuid];
 				}}
 			>
 				<img
 					class="cursor-pointer"
-					src={`/delivery/${image_id}/square`}
-					alt={image_id}
+					src={`/delivery/${remote_image.uuid}/square`}
+					alt={remote_image.uuid}
 				/>
 			</figure>
 			<Flex align="left">
 				<Checkbox
 					size="xs"
 					class="mr-2"
-					bind:checked={checked_ids[image_id]}
+					bind:checked={checked_ids[remote_image.uuid]}
 					on:change={() => {
-						checked_ids[image_id] = !checked_ids[image_id];
+						checked_ids[remote_image.uuid] =
+							!checked_ids[remote_image.uuid];
 					}}
 				/>
 				<Tooltip
 					position="bottom"
 					label={$_("page.images.action.copy_id")}
 				>
-					<ActionIcon use={[[clipboard, image_id]]}>
+					<ActionIcon use={[[clipboard, remote_image.uuid]]}>
 						<Copy />
 					</ActionIcon>
 				</Tooltip>
@@ -120,7 +124,7 @@
 				>
 					<ActionIcon
 						root="a"
-						href={`./${category}/${image_id}/blob`}
+						href={`/delivery/${remote_image.uuid}/original`}
 					>
 						<MagnifyingGlass /></ActionIcon
 					></Tooltip
@@ -129,7 +133,9 @@
 					position="bottom"
 					label={$_("page.images.action.view")}
 				>
-					<ActionIcon root="a" href={`./${category}/${image_id}`}
+					<ActionIcon
+						root="a"
+						href={`./${category}/${remote_image.uuid}`}
 						><InfoCircled /></ActionIcon
 					></Tooltip
 				>
@@ -137,7 +143,9 @@
 					position="bottom"
 					label={$_("page.images.action.edit")}
 				>
-					<ActionIcon root="a" href={`./${category}/${image_id}/edit`}
+					<ActionIcon
+						root="a"
+						href={`./${category}/${remote_image.uuid}/edit`}
 						><Pencil2 /></ActionIcon
 					></Tooltip
 				>
@@ -147,10 +155,12 @@
 				>
 					<ActionIcon
 						on:click={async () => {
-							await fetch(`./${category}/${image_id}`, {
+							await fetch(`./${category}/${remote_image.uuid}`, {
 								method: "DELETE",
 							});
-							image_ids = image_ids.filter((i) => i !== image_id);
+							remote_images = remote_images.filter(
+								(i) => i.uuid !== remote_image.uuid,
+							);
 						}}><Cross2 /></ActionIcon
 					></Tooltip
 				>

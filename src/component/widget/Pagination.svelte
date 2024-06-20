@@ -1,5 +1,6 @@
 <script lang="ts">
     import { Center } from "@svelteuidev/core";
+    import { number } from "svelte-i18n";
 
     export let path: string;
     export let page: number;
@@ -9,7 +10,7 @@
     <div class="flex">
         <!-- Previous Button -->
         <a
-            href="{path}?page={page - 1}"
+            href="{path}?page={Math.max(page - 1, 1)}"
             class="flex items-center justify-center px-3 h-8 mr-3 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
         >
             <svg

@@ -1,25 +1,21 @@
+import type { RemoteImage } from '$lib/types';
 import type { PageServerLoad } from './$types';
+import { ACCOUNT_ID, SERVER_URL } from '$env/static/private';
 
-export const load: PageServerLoad = async ({ platform, url, params: { category } }) => {
-    let page: number = parseInt(url.searchParams.get('page') ?? '1');
-    let per_page: number = parseInt(url.searchParams.get('per_page') ?? '24');
-    let skip = (page - 1) * per_page
+export const load: PageServerLoad = async ({ url, params: { category } }) => {
+    let page = parseInt(url.searchParams.get('page') ?? '1')
+    let skip = (page - 1) * 24
     if (skip < 0) {
         skip = 0
     }
-    let image_ids: string[] = [];
-    if (platform) {
-        const { results } = await platform.env.IMAGIO_DB.prepare(`
-            select uuid from images where category = ? order by create_time desc limit ?, ?
-        `).bind(category, skip, per_page).all()
-        image_ids = results.map(function (key: Record<string, unknown>) {
-            return `${key['uuid']}`
-        })
-    }
+
+    let remote_images: RemoteImage[] = await fetch(`${SERVER_URL}/${ACCOUNT_ID}/api/images/24/${skip}`)
+        .then(res => res.json());
+
     return {
-        category: category,
-        image_ids: image_ids,
+        remote_images,
+        page,
+        category,
         path: url.pathname,
-        page: page
     }
 }

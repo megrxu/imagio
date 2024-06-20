@@ -1,5 +1,5 @@
-export async function GET({ fetch, request, platform, params: { id, variant } }) {
-    if (platform) {
-        return fetch(`https://imagedelivery.net/${platform.env.ACCOUNT_HASH}/${id}/${variant}`);
-    }
+import { ACCOUNT_ID, SERVER_URL } from '$env/static/private';
+
+export async function GET({ fetch, request, params: { id, variant } }) {
+    return fetch(`${SERVER_URL}/${ACCOUNT_ID}/${id}/${variant}`);
 }

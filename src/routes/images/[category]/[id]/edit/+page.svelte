@@ -12,11 +12,11 @@
 	import { Check } from "radix-icons-svelte";
 	export let data: LayoutServerData;
 
-	$: ({ image, category } = data);
+	$: ({ image } = data);
 
 	let meta = data.image?.meta ?? {
 		tags: [],
-		category: category,
+		category: image.category,
 	};
 
 	let alert: string | null = null;

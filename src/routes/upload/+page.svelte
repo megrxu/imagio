@@ -1,27 +1,25 @@
 <script lang="ts">
-	import type { Image, UploadResp as CfImageResp } from "$lib/types";
-	import { uploadImage } from "$lib";
+	import type { Image, RemoteImage } from "$lib/types";
 	import { Center, Grid, Flex } from "@svelteuidev/core";
 	import { Button } from "@svelteuidev/core";
 	import { Alert } from "@svelteuidev/core";
 	import { NativeSelect } from "@svelteuidev/core";
 	import SubmitProgress from "../../component/widget/SubmitProgress.svelte";
 	import { _ } from "svelte-i18n";
+	import { v4 as uuidv4 } from "uuid";
 
 	let files: FileList;
 	let category: string = "public";
 	let placeholder: Boolean = true;
-	let images: Image[] = [];
 	let uploading: Boolean = false;
 	let uploaded = 0;
-	let uploadedImages: CfImageResp[] = [];
 	let alert: string | null = null;
+	let images: Image[] = [];
 
 	function onChange() {
 		if (files) {
 			placeholder = false;
 			uploaded = 0;
-			images = [];
 			for (const file of files) {
 				const reader = new FileReader();
 				reader.addEventListener("load", function () {
@@ -41,21 +39,16 @@
 			uploading = true;
 			let uploaded_cnt = 0;
 			images.forEach(async (image: Image) => {
-				let resp: Response = await uploadImage(image);
-				let res = await resp.text();
-				let uploadedImage: CfImageResp = JSON.parse(res);
-				if (uploadedImage.success == true) {
+				const formData = new FormData();
+				formData.append("file", image.file);
+				let resp: Response = await fetch("/upload", {
+					method: "PUT",
+					body: formData,
+				});
+				let remotImage: RemoteImage = await resp.json();
+				if (remotImage.uuid) {
 					uploaded_cnt += 1;
-					uploaded = (uploaded_cnt / files.length) * 100;
-					uploadedImages = [...uploadedImages, uploadedImage];
-					// Update the database
-					await fetch("/upload", {
-						method: "PUT",
-						body: JSON.stringify({
-							id: uploadedImage.result.id,
-							category: category,
-						}),
-					});
+					uploaded = Math.floor((uploaded_cnt / files.length) * 100);
 				} else {
 					alert = $_("page.upload.images_upload_failed", {
 						values: { name: image.file.name },
@@ -82,7 +75,7 @@
 	bind:value={category}
 />
 <Flex class="m-8" justify="center" align="center" gap="xl">
-	<Button ripple class="p-0">
+	<Button ripple>
 		<input
 			multiple
 			class="hidden"
@@ -90,15 +83,13 @@
 			bind:files
 			on:change={onChange}
 			id="uploads"
-			accept="image/png, image/jpeg, image/gif"
+			accept="*"
 		/>
 		<label for="uploads" class="w-full cursor-pointer"
 			>{$_("page.upload.select")}</label
 		>
 	</Button>
-	<Button ripple href={`/images/${category}`}
-		>{$_("term.gallery")}</Button
-	>
+	<Button ripple href={`/images/${category}`}>{$_("term.gallery")}</Button>
 	<Button type="submit" color="teal" ripple on:click={doUpload}
 		>{$_("page.upload.upload")}</Button
 	>
@@ -125,4 +116,5 @@
 		{/each}
 	</Grid>
 {/if}
+
 <SubmitProgress doing={uploading} done={uploaded} />

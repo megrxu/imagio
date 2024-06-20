@@ -19,11 +19,11 @@
 			<slot />
 		</div>
 	{:else}
-		<Container class="md:w-2/3 w-full mx-4">
+		<Container class="md:w-2/3 w-full mx-auto">
 			<slot />
-			<Footer height={48}>
+			<Footer height={48} class="my-4">
 				<Center>
-					<Box class="my-4">Imageio</Box>
+					<Box class="my-4">Imagio</Box>
 				</Center>
 			</Footer>
 		</Container>
