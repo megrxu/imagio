@@ -72,7 +72,7 @@
 <Center class="m-8 text-xl font-black">{$_("page.images.title")}</Center>
 
 <EditMeta bind:meta />
-<Flex class="m-8" justify="center" align="center" gap="xl">
+<Flex class="m-auto my-8" justify="center" align="center" gap="xl">
 	<Button ripple href="/upload">{$_("page.upload.upload")}</Button>
 	<Button
 		type="submit"
@@ -121,18 +121,18 @@
 		</Flex>
 	{/if}
 	{#each remoteImages as remoteImage}
-		<Grid.Col sm={12} md={6} lg={3}>
+		<Grid.Col sm={6} md={4} lg={3}>
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
 			<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 			<figure
-				class="my-2"
+				class="my-2 mx-0"
 				on:click={() => {
 					checked_ids[remoteImage.uuid] =
 						!checked_ids[remoteImage.uuid];
 				}}
 			>
 				<img
-					class="cursor-pointer"
+					class="cursor-pointer w-full"
 					src={`/delivery/${remoteImage.uuid}/square`}
 					alt={remoteImage.uuid}
 				/>
