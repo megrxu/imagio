@@ -6,8 +6,8 @@
     export let page: number;
 </script>
 
-<Center class="my-2">
-    <div class="flex">
+<Center>
+    <div class="flex my-2">
         <!-- Previous Button -->
         <a
             href="{path}?page={Math.max(page - 1, 1)}"

@@ -16,11 +16,13 @@
 		Cross2,
 	} from "radix-icons-svelte";
 
-	import { clipboard } from "@svelteuidev/composables";
+	import { clipboard, sleep } from "@svelteuidev/composables";
 	import type { PageServerData } from "./$types";
 	import { _ } from "svelte-i18n";
 	import EditMeta from "../../../component/widget/EditMeta.svelte";
 	import Pagination from "../../../component/widget/Pagination.svelte";
+	import { json } from "@sveltejs/kit";
+	import type { RemoteImage } from "$lib/types";
 
 	let checked_ids: Record<string, boolean> = {};
 
@@ -30,12 +32,14 @@
 		checked_ids[remote_image.uuid] = false;
 	});
 
-	$: ({ remote_images, page, category, path } = data);
+	$: ({ remote_images: remoteImages, page, category, path } = data);
 
 	$: meta = {
 		category: category,
 		tags: [],
 	};
+
+	let appendImages: RemoteImage[] = [];
 
 	const doEdit = async (image_id: string) => {
 		fetch(`./${category}/${image_id}/edit`, {
@@ -44,6 +48,13 @@
 		}).then((response) => {
 			console.log(response);
 		});
+	};
+
+	const fetchMore = async (more: number) => {
+		appendImages = await (
+			await fetch(`/delivery?limit=${more}&skip=${page * 24 - more}`)
+		).json();
+		remoteImages = remoteImages.concat(appendImages);
 	};
 </script>
 
@@ -56,7 +67,7 @@
 		type="submit"
 		ripple
 		on:click={() => {
-			remote_images.forEach(async (remote_image) => {
+			remoteImages.forEach(async (remote_image) => {
 				if (checked_ids[remote_image.uuid]) {
 					await doEdit(remote_image.uuid);
 				}
@@ -67,23 +78,27 @@
 		type="submit"
 		color="red"
 		ripple
-		on:click={() => {
-			remote_images.forEach(async (remote_image) => {
+		on:click={async () => {
+			var more = 0;
+			for (const remote_image of remoteImages) {
 				if (checked_ids[remote_image.uuid]) {
-					await fetch(`./${category}/${remote_image.uuid}`, {
+					fetch(`./${category}/${remote_image.uuid}`, {
 						method: "DELETE",
 					});
-					remote_images = remote_images.filter(
+					remoteImages = remoteImages.filter(
 						(image) => image.uuid !== remote_image.uuid,
 					);
+					more += 1;
 				}
-			});
+			}
+			await sleep(500);
+			await fetchMore(more);
 		}}>{$_("page.images.batch_delete")}</Button
 	>
 </Flex>
 <Pagination {path} {page} />
-<Grid>
-	{#each remote_images as remote_image}
+<Grid class="my-2">
+	{#each remoteImages as remote_image}
 		<Grid.Col sm={12} md={6} lg={3}>
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
 			<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
@@ -158,9 +173,10 @@
 							await fetch(`./${category}/${remote_image.uuid}`, {
 								method: "DELETE",
 							});
-							remote_images = remote_images.filter(
+							remoteImages = remoteImages.filter(
 								(i) => i.uuid !== remote_image.uuid,
 							);
+							fetchMore(1);
 						}}><Cross2 /></ActionIcon
 					></Tooltip
 				>
@@ -168,3 +184,4 @@
 		</Grid.Col>
 	{/each}
 </Grid>
+<Pagination {path} {page} />

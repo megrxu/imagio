@@ -6,7 +6,8 @@
 	import { NativeSelect } from "@svelteuidev/core";
 	import SubmitProgress from "../../component/widget/SubmitProgress.svelte";
 	import { _ } from "svelte-i18n";
-	import { v4 as uuidv4 } from "uuid";
+	import { redirect } from "@sveltejs/kit";
+	import { sleep } from "@svelteuidev/composables";
 
 	let files: FileList;
 	let category: string = "public";
@@ -38,10 +39,10 @@
 		if (images) {
 			uploading = true;
 			let uploaded_cnt = 0;
-			images.forEach(async (image: Image) => {
+			for (const image of images) {
 				const formData = new FormData();
 				formData.append("file", image.file);
-				let resp: Response = await fetch("/upload", {
+				let resp: Response = await fetch(`/upload/${category}`, {
 					method: "PUT",
 					body: formData,
 				});
@@ -49,15 +50,18 @@
 				if (remotImage.uuid) {
 					uploaded_cnt += 1;
 					uploaded = Math.floor((uploaded_cnt / files.length) * 100);
-				} else {
-					alert = $_("page.upload.images_upload_failed", {
-						values: { name: image.file.name },
-					});
-					uploading = false;
-					return;
 				}
-			});
+				//  else {
+				// 	alert = $_("page.upload.images_upload_failed", {
+				// 		values: { name: image.file.name },
+				// 	});
+				// 	uploading = false;
+				// 	return;
+				// }
+			}
 			uploading = false;
+			images = [];
+			redirect(301, `/images/${category}`);
 		}
 	}
 </script>
