@@ -18,7 +18,8 @@
                 "copy_id": "拷贝 ID",
                 "view": "详情",
                 "blob": "查看原图"
-            }
+            },
+            "no_images": "没有更多图片了"
         },
         "image": {
             "edit": {

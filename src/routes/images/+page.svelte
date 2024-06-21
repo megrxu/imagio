@@ -40,7 +40,9 @@
 
 	const fetchMore = async (more: number) => {
 		console.log(more);
-		console.log(`/delivery?category=${category}&limit=${more}&skip=${page * 24 - more}`);
+		console.log(
+			`/delivery?category=${category}&limit=${more}&skip=${page * 24 - more}`,
+		);
 		appendImages = await (
 			await fetch(
 				`/delivery?category=${category}&limit=${more}&skip=${page * 24 - more}`,
@@ -108,6 +110,16 @@
 </Flex>
 <Pagination {path} {page} />
 <Grid class="my-2">
+	{#if remoteImages.length === 0}
+		<Flex
+			class="h-96 w-full border-dashed border-zinc-300 border-2 rounded-lg text-lg text-slate-600"
+			justify="center"
+			align="center"
+			direction="column"
+		>
+			{$_("page.images.no_images")}
+		</Flex>
+	{/if}
 	{#each remoteImages as remoteImage}
 		<Grid.Col sm={12} md={6} lg={3}>
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
