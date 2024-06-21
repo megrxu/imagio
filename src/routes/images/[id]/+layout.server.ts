@@ -11,6 +11,7 @@ export const load: LayoutServerLoad = async ({ fetch, params: { id } }) => {
 		},
 	};
 
+	console.log('fetching', ENDPOINT);
 	let image: RemoteImage = await (await fetch(ENDPOINT, req)).json();
 
 	return {

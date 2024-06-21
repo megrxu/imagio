@@ -46,11 +46,11 @@
 					method: "PUT",
 					body: formData,
 				});
-				let remotImage: RemoteImage = await resp.json();
-				if (remotImage.uuid) {
-					uploaded_cnt += 1;
-					uploaded = Math.floor((uploaded_cnt / files.length) * 100);
-				}
+				// let remotImage: RemoteImage = await resp.json();
+				// if (remotImage.uuid) {
+				uploaded_cnt += 1;
+				uploaded = Math.floor((uploaded_cnt / files.length) * 100);
+				// }
 				//  else {
 				// 	alert = $_("page.upload.images_upload_failed", {
 				// 		values: { name: image.file.name },
@@ -93,7 +93,7 @@
 			>{$_("page.upload.select")}</label
 		>
 	</Button>
-	<Button ripple href={`/images/${category}`}>{$_("term.gallery")}</Button>
+	<Button ripple href={`/images`}>{$_("term.gallery")}</Button>
 	<Button type="submit" color="teal" ripple on:click={doUpload}
 		>{$_("page.upload.upload")}</Button
 	>
