@@ -21,7 +21,6 @@
 	import { _ } from "svelte-i18n";
 	import EditMeta from "../../component/widget/EditMeta.svelte";
 	import Pagination from "../../component/widget/Pagination.svelte";
-	import { json } from "@sveltejs/kit";
 	import type { RemoteImage } from "$lib/types";
 	import { onMount } from "svelte";
 
@@ -109,17 +108,17 @@
 	>
 </Flex>
 <Pagination {path} {page} />
+{#if remoteImages.length === 0}
+	<Flex
+		class="my-2 h-96 w-full border-dashed border-zinc-300 border-2 rounded-lg text-lg text-slate-600"
+		justify="center"
+		align="center"
+		direction="column"
+	>
+		{$_("page.images.no_images")}
+	</Flex>
+{/if}
 <Grid class="my-2">
-	{#if remoteImages.length === 0}
-		<Flex
-			class="h-96 w-full border-dashed border-zinc-300 border-2 rounded-lg text-lg text-slate-600"
-			justify="center"
-			align="center"
-			direction="column"
-		>
-			{$_("page.images.no_images")}
-		</Flex>
-	{/if}
 	{#each remoteImages as remoteImage}
 		<Grid.Col sm={6} md={4} lg={3}>
 			<!-- svelte-ignore a11y-click-events-have-key-events -->

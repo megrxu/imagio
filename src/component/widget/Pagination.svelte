@@ -1,12 +1,11 @@
 <script lang="ts">
     import { Center } from "@svelteuidev/core";
-    import { number } from "svelte-i18n";
 
     export let path: string;
     export let page: number;
 </script>
 
-<Center>
+<Center class="my-2">
     <div class="flex my-2">
         <!-- Previous Button -->
         <a

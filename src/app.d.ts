@@ -6,14 +6,7 @@ declare global {
 		// interface Error {}
 		// interface Locals {}
 		// interface PageData {}
-
-		interface Platform {
-			env: {
-				SERVER_URL: string,
-				ACCOUNT_ID: string,
-				TOKEN: string,
-			}
-		}
+		// interface Platform {}
 	}
 }
 

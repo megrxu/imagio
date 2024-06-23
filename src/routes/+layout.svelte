@@ -3,6 +3,7 @@
 	import { page } from "$app/stores";
 	import "../app.css";
 	import { Box, Center, Container, Footer, Loader } from "@svelteuidev/core";
+	import { GithubLogo, Underline } from "radix-icons-svelte";
 
 	let mounted = false;
 
@@ -23,7 +24,13 @@
 			<slot />
 			<Footer height={48} class="my-4">
 				<Center>
-					<Box class="my-4">Imagio</Box>
+					<Box class="my-4"
+						><strong>Imagio</strong> | Build with ♥️ at
+						<a
+							href="https://github.com/megrxu/imagio"
+							target="_blank"><u>GitHub</u></a
+						></Box
+					>
 				</Center>
 			</Footer>
 		</Container>
