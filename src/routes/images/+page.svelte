@@ -6,6 +6,7 @@
 		Checkbox,
 		Button,
 		Tooltip,
+		Loader,
 	} from "@svelteuidev/core";
 	import { ActionIcon } from "@svelteuidev/core";
 	import {
@@ -38,21 +39,16 @@
 	let appendImages: RemoteImage[];
 
 	const fetchMore = async (more: number) => {
-		console.log(more);
-		console.log(
-			`/delivery?category=${category}&limit=${more}&skip=${page * 24 - more}`,
-		);
 		appendImages = await (
 			await fetch(
 				`/delivery?category=${category}&limit=${more}&skip=${page * 24 - more}`,
 			)
 		).json();
-		console.log(appendImages);
 		remoteImages = remoteImages.concat(appendImages);
 	};
 
-	const doEdit = async (image_id: string) => {
-		fetch(`./${category}/${image_id}/edit`, {
+	const doEdit = async (imageUUID: string) => {
+		fetch(`./${category}/${imageUUID}/edit`, {
 			method: "PATCH",
 			body: JSON.stringify(meta),
 		}).then((response) => {
@@ -60,12 +56,17 @@
 		});
 	};
 
-	onMount(async () => {
-		appendImages = [];
-		remoteImages.forEach((remote_image) => {
-			checked_ids[remote_image.uuid] = false;
+	const preload = async (src: string) => {
+		const resp = await fetch(src);
+		const blob = await resp.blob();
+
+		const res: Promise<string> = new Promise(function (resolve) {
+			let reader = new FileReader();
+			reader.readAsDataURL(blob);
+			reader.onload = () => resolve(reader.result?.toString() || "");
 		});
-	});
+		return res;
+	};
 </script>
 
 <Center class="m-8 text-xl font-black">{$_("page.images.title")}</Center>
@@ -130,11 +131,17 @@
 						!checked_ids[remoteImage.uuid];
 				}}
 			>
-				<img
-					class="cursor-pointer w-full"
-					src={`/delivery/${remoteImage.uuid}/square`}
-					alt={remoteImage.uuid}
-				/>
+				{#await preload(`/delivery/${remoteImage.uuid}/square`)}
+					<Center style="height: 216px">
+						<Loader />
+					</Center>
+				{:then base64}
+					<img
+						src={base64}
+						class="cursor-pointer w-full"
+						alt={remoteImage.uuid}
+					/>
+				{/await}
 			</figure>
 			<Flex align="left">
 				<Checkbox
