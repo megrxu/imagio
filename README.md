@@ -14,7 +14,7 @@ To build and deploy imagio, follow the steps below:
    1. `ACCOUNT_ID`: The account id specified when running the server.
    2. `TOKEN`: Not used currently.
    3. `SERVER_URL`: Your imagio-server instance URL.
-   3. `S3_PUBLIC_ACCESS_ENDPOINT`: Your imagio-server instance URL.
+   3. `S3_PUBLIC_ACCESS_ENDPOINT`: Your S3 public access endpoint.
 3. Publish your pages.
 
 ## Endpoints
