@@ -19,6 +19,6 @@ export const PATCH = async ({ fetch, platform, request, params: { id } }) => {
                 }
             )
         };
-        return fetch(ENDPOINT, req)
+    return fetch(ENDPOINT, req)
     }
 }
