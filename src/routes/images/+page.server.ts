@@ -1,5 +1,6 @@
 import type { RemoteImage } from '$lib/types';
-import { ACCOUNT_ID, SERVER_URL } from '$env/static/private';
+const ACCOUNT_ID = import.meta.env.ACCOUNT_ID;
+const SERVER_URL = import.meta.env.SERVER_URL;
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ url }) => {

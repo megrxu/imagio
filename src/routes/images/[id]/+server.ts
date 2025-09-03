@@ -1,6 +1,8 @@
-import { SERVER_URL, ACCOUNT_ID, TOKEN } from '$env/static/private';
+const SERVER_URL = import.meta.env.SERVER_URL;
+const ACCOUNT_ID = import.meta.env.ACCOUNT_ID;
+const TOKEN = import.meta.env.TOKEN;
 
-export async function DELETE({ fetch, params: { id } }) {
+export const DELETE = async ({ fetch, params: { id } }) => {
     const ENDPOINT = `${SERVER_URL}/${ACCOUNT_ID}/api/image/${id}`
     const req = {
         method: 'DELETE',
@@ -9,4 +11,4 @@ export async function DELETE({ fetch, params: { id } }) {
         },
     };
     return fetch(ENDPOINT, req)
-}
+};

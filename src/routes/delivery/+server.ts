@@ -1,4 +1,5 @@
-import { ACCOUNT_ID, SERVER_URL } from '$env/static/private';
+const ACCOUNT_ID = import.meta.env.ACCOUNT_ID;
+const SERVER_URL = import.meta.env.SERVER_URL;
 
 export function GET({ fetch, url }) {
     let limit = parseInt(url.searchParams.get('limit') ?? '1')

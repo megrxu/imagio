@@ -1,5 +1,7 @@
 import type { LayoutServerLoad } from './$types';
-import { SERVER_URL, ACCOUNT_ID, TOKEN } from '$env/static/private';
+const SERVER_URL = import.meta.env.SERVER_URL;
+const ACCOUNT_ID = import.meta.env.ACCOUNT_ID;
+const TOKEN = import.meta.env.TOKEN;
 import type { RemoteImage } from '$lib/types';
 
 export const load: LayoutServerLoad = async ({ fetch, params: { id } }) => {
