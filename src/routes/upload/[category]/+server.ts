@@ -1,6 +1,4 @@
-const ACCOUNT_ID = import.meta.env.ACCOUNT_ID;
-const SERVER_URL = import.meta.env.SERVER_URL;
-
-export const PUT = async ({ fetch, request, params: { category } }) => {
+export const PUT = async ({ fetch, request, params: { category }, platform }) => {
+    const { ACCOUNT_ID, SERVER_URL } = (platform as any).env;
     return await fetch(`${SERVER_URL}/${ACCOUNT_ID}/api/images/${category}`, request)
 };

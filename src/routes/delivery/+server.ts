@@ -1,7 +1,5 @@
-const ACCOUNT_ID = import.meta.env.ACCOUNT_ID;
-const SERVER_URL = import.meta.env.SERVER_URL;
-
-export function GET({ fetch, url }) {
+export function GET({ fetch, url, platform }) {
+    const { ACCOUNT_ID, SERVER_URL } = (platform as any).env;
     let limit = parseInt(url.searchParams.get('limit') ?? '1')
     let skip = parseInt(url.searchParams.get('skip') ?? '0')
     let category = url.searchParams.get('category') ?? 'public';
