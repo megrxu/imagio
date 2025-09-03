@@ -15,6 +15,7 @@
     "@sveltejs/adapter-auto": "^2.1.1",
     "@sveltejs/adapter-cloudflare": "^2.3.4",
     "@sveltejs/kit": "^2.37.0",
+    "@tailwindcss/postcss": "^4.1.12",
     "@types/uuid": "^9.0.8",
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",
