@@ -1,8 +1,7 @@
-import { ACCOUNT_ID, SERVER_URL, TOKEN } from '$lib/server/env';
 import type { ImageMetaData } from "$lib/types";
 
-
-export async function PATCH({ fetch, request, params: { id } }) {
+export async function PATCH({ fetch, request, params: { id }, platform }) {
+    let { SERVER_URL, ACCOUNT_ID, TOKEN } = platform?.env ?? {};
     const ENDPOINT = `${SERVER_URL}/${ACCOUNT_ID}/image/${id}`
     let meta: ImageMetaData = JSON.parse(await request.text())
     const req = {

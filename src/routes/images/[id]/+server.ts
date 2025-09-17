@@ -1,6 +1,5 @@
-import { SERVER_URL, ACCOUNT_ID, TOKEN } from '$lib/server/env';
-
-export async function DELETE({ fetch, params: { id } }) {
+export async function DELETE({ fetch, params: { id }, platform }) {
+    let { SERVER_URL, ACCOUNT_ID, TOKEN } = platform?.env ?? {};
     const ENDPOINT = `${SERVER_URL}/${ACCOUNT_ID}/api/image/${id}`
     const req = {
         method: 'DELETE',
