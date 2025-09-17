@@ -1,11 +1,8 @@
 import adapter from '@sveltejs/adapter-cloudflare';
-import { vitePreprocess } from "@sveltejs/kit/vite";
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
-  // Consult https://kit.svelte.dev/docs/integrations#preprocessors
-  // for more information about preprocessors
-  preprocess: [vitePreprocess({})],
+  // No explicit preprocess: rely on svelte/vite defaults (TS + PostCSS via Vite)
 
   kit: {
     // adapter-auto only supports some environments, see https://kit.svelte.dev/docs/adapter-auto for a list.
@@ -13,6 +10,10 @@ const config = {
     // See https://kit.svelte.dev/docs/adapters for more information about adapters.
     adapter: adapter(),
   },
+  compilerOptions: {
+    // Keep Svelte 4 semantics to avoid accidental breaking while upgrading
+    runes: false
+  }
 };
 
 export default config;
