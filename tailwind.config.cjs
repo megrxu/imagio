@@ -14,6 +14,8 @@ const config = {
   darkMode: 'class',
   content: [
     './src/**/*.{html,js,svelte,ts}',
+    './node_modules/flowbite-svelte/**/*.{html,js,svelte,ts}',
+    './node_modules/flowbite/**/*.{js,ts}',
   ],
   theme: {
     extend: {
@@ -25,6 +27,7 @@ const config = {
     },
   },
   plugins: [
+    require('flowbite/plugin'),
     plugin(function ({ addVariant }) {
       addVariant('child', '& > *');
     })

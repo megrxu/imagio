@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Loader, Flex, Progress } from "@svelteuidev/core";
+    import { Spinner, Progressbar } from "flowbite-svelte";
     import { Check } from "radix-icons-svelte";
     export const action = "Uploading...";
     export const action_done = "Done.";
@@ -9,15 +9,19 @@
 
 <div class="w-full">
     {#if doing}
-        <Flex class="w-full my-4">
+        <div class="w-full my-4 flex items-center">
             {#if done < 100}
-                <Loader size={48} class="mr-4" />{action}({Math.round(
-                    done * 100,
-                ) / 100}/100)
+                <Spinner
+                    class="mr-4"
+                    size="6"
+                    color="gray"
+                />{action}({Math.round(done * 100) / 100}/100)
             {:else}
                 <Check size={24} class="mr-4" />{action_done}
             {/if}
-        </Flex>
-        <Progress class="w-full my-4" size="lg" tween value={done} />
+        </div>
+        <div class="w-full my-4">
+            <Progressbar progress={done} color="blue" size="h-2.5" />
+        </div>
     {/if}
 </div>

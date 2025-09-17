@@ -1,13 +1,9 @@
 <script lang="ts">
 	import type { Image, RemoteImage } from "$lib/types";
-	import { Center, Grid, Flex } from "@svelteuidev/core";
-	import { Button } from "@svelteuidev/core";
-	import { Alert } from "@svelteuidev/core";
-	import { NativeSelect } from "@svelteuidev/core";
 	import SubmitProgress from "../../component/widget/SubmitProgress.svelte";
 	import { _ } from "svelte-i18n";
 	import { redirect } from "@sveltejs/kit";
-	import { sleep } from "@svelteuidev/composables";
+	import { Alert, Label, Select, Button, Card } from "flowbite-svelte";
 
 	let files: FileList;
 	let category: string = "public";
@@ -46,8 +42,8 @@
 					method: "PUT",
 					body: formData,
 				});
-				// let remotImage: RemoteImage = await resp.json();
-				// if (remotImage.uuid) {
+				// let remoteImage: RemoteImage = await resp.json();
+				// if (remoteImage.uuid) {
 				uploaded_cnt += 1;
 				uploaded = Math.floor((uploaded_cnt / files.length) * 100);
 				// }
@@ -66,59 +62,58 @@
 	}
 </script>
 
-<Center class="m-8 text-xl font-black">{$_("page.upload.upload")}</Center>
+<div class="m-8 text-xl font-black text-center">{$_("page.upload.upload")}</div>
 {#if alert}
-	<Alert title="Alert!">
-		{alert}
-	</Alert>
+	<Alert color="red" class="mb-4">{alert}</Alert>
 {/if}
-<NativeSelect
-	data={["public", "private"]}
-	placeholder={category}
-	label={$_("term.category")}
-	bind:value={category}
-/>
-<Flex class="m-8" justify="center" align="center" gap="xl">
-	<Button ripple>
-		<input
-			multiple
-			class="hidden"
-			type="file"
-			bind:files
-			on:change={onChange}
-			id="uploads"
-			accept="*"
-		/>
-		<label for="uploads" class="w-full cursor-pointer"
-			>{$_("page.upload.select")}</label
-		>
-	</Button>
-	<Button ripple href={`/images`}>{$_("term.gallery")}</Button>
-	<Button type="submit" color="teal" ripple on:click={doUpload}
+<div class="mb-4">
+	<Label for="upload-category" class="mb-2">{$_("term.category")}</Label>
+	<Select id="upload-category" bind:value={category} class="w-full">
+		<option value="public">public</option>
+		<option value="private">private</option>
+	</Select>
+</div>
+<div class="m-8 flex items-center justify-center gap-4">
+	<label for="uploads" class="cursor-pointer">
+		<Button size="sm" pill>{$_("page.upload.select")}</Button>
+	</label>
+	<a href={`/images`}
+		><Button size="sm" pill color="light">{$_("term.gallery")}</Button></a
+	>
+	<Button size="sm" pill color="green" on:click={doUpload}
 		>{$_("page.upload.upload")}</Button
 	>
-</Flex>
+	<input
+		multiple
+		class="hidden"
+		type="file"
+		bind:files
+		on:change={onChange}
+		id="uploads"
+		accept="*"
+	/>
+	>
+</div>
 {#if placeholder}
-	<label for="uploads" class="h-96 w-full">
-		<Flex
-			class="h-96 w-full border-dashed border-zinc-300 border-2 rounded-lg text-lg text-slate-300"
-			justify="center"
-			align="center"
-			direction="column"
+	<label for="uploads" class="block w-full">
+		<Card
+			class="w-full h-96 flex items-center justify-center cursor-pointer"
 		>
 			{$_("page.upload.images_placeholder")}
-		</Flex>
+		</Card>
 	</label>
 {:else}
-	<Grid class="h-96 w-full overflow-y-auto ">
+	<div
+		class="grid grid-cols-2 md:grid-cols-4 gap-4 h-96 w-full overflow-y-auto"
+	>
 		{#each images as image}
-			<Grid.Col span={3}>
+			<div>
 				<figure>
 					<img src={String(image.src)} alt="" />
 				</figure>
-			</Grid.Col>
+			</div>
 		{/each}
-	</Grid>
+	</div>
 {/if}
 
 <SubmitProgress doing={uploading} done={uploaded} />

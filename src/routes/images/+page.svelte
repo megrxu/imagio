@@ -1,29 +1,18 @@
 <script lang="ts">
 	import {
-		Center,
-		Flex,
-		Grid,
-		Checkbox,
-		Button,
-		Tooltip,
-		Loader,
-	} from "@svelteuidev/core";
-	import { ActionIcon } from "@svelteuidev/core";
-	import {
 		Copy,
 		MagnifyingGlass,
 		InfoCircled,
 		Pencil2,
 		Cross2,
 	} from "radix-icons-svelte";
-
-	import { clipboard, sleep } from "@svelteuidev/composables";
 	import type { PageServerData } from "./$types";
 	import { _ } from "svelte-i18n";
 	import EditMeta from "../../component/widget/EditMeta.svelte";
 	import Pagination from "../../component/widget/Pagination.svelte";
 	import type { RemoteImage } from "$lib/types";
 	import { onMount } from "svelte";
+	import { Button, Checkbox, Spinner, Alert } from "flowbite-svelte";
 
 	let checked_ids: Record<string, boolean> = {};
 
@@ -56,6 +45,8 @@
 		});
 	};
 
+	const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
 	const preload = async (src: string) => {
 		const resp = await fetch(src);
 		const blob = await resp.blob();
@@ -69,14 +60,18 @@
 	};
 </script>
 
-<Center class="m-8 text-xl font-black">{$_("page.images.title")}</Center>
+<div class="m-8 text-xl font-black text-center">{$_("page.images.title")}</div>
 
 <EditMeta bind:meta />
-<Flex class="m-auto my-8" justify="center" align="center" gap="xl">
-	<Button ripple href="/upload">{$_("page.upload.upload")}</Button>
+<div class="m-auto my-8 flex items-center justify-center gap-4">
+	<a href="/upload"
+		><Button size="sm" pill color="blue">{$_("page.upload.upload")}</Button
+		></a
+	>
 	<Button
-		type="submit"
-		ripple
+		size="sm"
+		pill
+		color="dark"
 		on:click={() => {
 			remoteImages.forEach(async (remote_image) => {
 				if (checked_ids[remote_image.uuid]) {
@@ -86,9 +81,9 @@
 		}}>{$_("page.images.batch_edit")}</Button
 	>
 	<Button
-		type="submit"
+		size="sm"
+		pill
 		color="red"
-		ripple
 		on:click={async () => {
 			var more = 0;
 			for (const remoteImage of remoteImages) {
@@ -107,34 +102,34 @@
 			await fetchMore(more);
 		}}>{$_("page.images.batch_delete")}</Button
 	>
-</Flex>
+</div>
 <Pagination {path} {page} />
 {#if remoteImages.length === 0}
-	<Flex
-		class="my-2 h-96 w-full border-dashed border-zinc-300 border-2 rounded-lg text-lg text-slate-600"
-		justify="center"
-		align="center"
-		direction="column"
+	<Alert color="gray" class="my-2 w-full text-center"
+		>{$_("page.images.no_images")}</Alert
 	>
-		{$_("page.images.no_images")}
-	</Flex>
 {/if}
-<Grid class="my-2">
+<div class="my-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
 	{#each remoteImages as remoteImage}
-		<Grid.Col sm={6} md={4} lg={3}>
+		<div>
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
 			<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 			<figure
 				class="my-2 mx-0"
 				on:click={() => {
-					checked_ids[remoteImage.uuid] =
-						!checked_ids[remoteImage.uuid];
+					checked_ids = {
+						...checked_ids,
+						[remoteImage.uuid]: !checked_ids[remoteImage.uuid],
+					};
 				}}
 			>
 				{#await preload(`/delivery/${remoteImage.uuid}/square`)}
-					<Center style="height: 216px">
-						<Loader />
-					</Center>
+					<div
+						style="height: 216px"
+						class="flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded"
+					>
+						<Spinner size="6" color="gray" />
+					</div>
 				{:then base64}
 					<img
 						src={base64}
@@ -143,71 +138,64 @@
 					/>
 				{/await}
 			</figure>
-			<Flex align="left">
+			<div class="flex items-center gap-1">
 				<Checkbox
-					size="xs"
-					class="mr-2"
+					class="mr-1"
 					bind:checked={checked_ids[remoteImage.uuid]}
-					on:change={() => {
-						checked_ids[remoteImage.uuid] =
-							!checked_ids[remoteImage.uuid];
-					}}
 				/>
-				<Tooltip
-					position="bottom"
-					label={$_("page.images.action.copy_id")}
+				<Button
+					color="none"
+					size="xs"
+					class="p-1 hover:bg-transparent focus:ring-0"
+					title={$_("page.images.action.copy_id")}
+					on:click={() =>
+						navigator.clipboard.writeText(remoteImage.uuid)}
+					><Copy class="text-gray-600" /></Button
 				>
-					<ActionIcon use={[[clipboard, remoteImage.uuid]]}>
-						<Copy />
-					</ActionIcon>
-				</Tooltip>
-				<Tooltip
-					position="bottom"
-					label={$_("page.images.action.blob")}
+				<Button
+					tag="a"
+					href={`/delivery/${remoteImage.uuid}/original`}
+					color="none"
+					size="xs"
+					class="p-1 hover:bg-transparent focus:ring-0"
+					title={$_("page.images.action.blob")}
+					><MagnifyingGlass class="text-blue-600" /></Button
 				>
-					<ActionIcon
-						root="a"
-						href={`/delivery/${remoteImage.uuid}/original`}
-					>
-						<MagnifyingGlass /></ActionIcon
-					></Tooltip
+				<Button
+					tag="a"
+					href={`/images/${remoteImage.uuid}`}
+					color="none"
+					size="xs"
+					class="p-1 hover:bg-transparent focus:ring-0"
+					title={$_("page.images.action.view")}
+					><InfoCircled class="text-blue-600" /></Button
 				>
-				<Tooltip
-					position="bottom"
-					label={$_("page.images.action.view")}
+				<Button
+					tag="a"
+					href={`/images/${remoteImage.uuid}/edit`}
+					color="none"
+					size="xs"
+					class="p-1 hover:bg-transparent focus:ring-0"
+					title={$_("page.images.action.edit")}
+					><Pencil2 class="text-amber-500" /></Button
 				>
-					<ActionIcon root="a" href={`/images/${remoteImage.uuid}`}
-						><InfoCircled /></ActionIcon
-					></Tooltip
+				<Button
+					color="none"
+					size="xs"
+					class="p-1 hover:bg-transparent focus:ring-0"
+					title={$_("page.images.action.delete")}
+					on:click={async () => {
+						await fetch(`/images/${remoteImage.uuid}`, {
+							method: "DELETE",
+						});
+						remoteImages = remoteImages.filter(
+							(i) => i.uuid !== remoteImage.uuid,
+						);
+						fetchMore(1);
+					}}><Cross2 class="text-red-600" /></Button
 				>
-				<Tooltip
-					position="bottom"
-					label={$_("page.images.action.edit")}
-				>
-					<ActionIcon
-						root="a"
-						href={`/images/${remoteImage.uuid}/edit`}
-						><Pencil2 /></ActionIcon
-					></Tooltip
-				>
-				<Tooltip
-					position="bottom"
-					label={$_("page.images.action.delete")}
-				>
-					<ActionIcon
-						on:click={async () => {
-							await fetch(`/images/${remoteImage.uuid}`, {
-								method: "DELETE",
-							});
-							remoteImages = remoteImages.filter(
-								(i) => i.uuid !== remoteImage.uuid,
-							);
-							fetchMore(1);
-						}}><Cross2 /></ActionIcon
-					></Tooltip
-				>
-			</Flex>
-		</Grid.Col>
+			</div>
+		</div>
 	{/each}
-</Grid>
+</div>
 <Pagination {path} {page} />

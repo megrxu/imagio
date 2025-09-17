@@ -27,10 +27,8 @@
   "type": "module",
   "dependencies": {
     "@cloudflare/pages-plugin-cloudflare-access": "^1.0.5",
-    "@svelteuidev/composables": "^0.15.7",
-    "@svelteuidev/core": "^0.15.7",
-    "@svelteuidev/dates": "^0.15.7",
-    "@svelteuidev/motion": "^0.15.7",
+    "flowbite": "^2.4.1",
+    "flowbite-svelte": "^0.46.22",
     "nanoid": "^5.1.5",
     "radix-icons-svelte": "^1.2.1",
     "svelte-i18n": "^4.0.1",

@@ -1,15 +1,9 @@
 <script lang="ts">
-	import {
-		Center,
-		Flex,
-		Button,
-		Alert,
-		Notification,
-	} from "@svelteuidev/core";
 	import { _ } from "svelte-i18n";
 	import type { LayoutServerData } from "../$types";
 	import EditMeta from "../../../../component/widget/EditMeta.svelte";
 	import { Check } from "radix-icons-svelte";
+	import { Button } from "flowbite-svelte";
 	export let data: LayoutServerData;
 
 	$: ({ image } = data);
@@ -30,14 +24,16 @@
 	};
 </script>
 
-<Center class="m-8 text-xl font-black">{$_("page.image.edit.title")}</Center>
+<div class="m-8 text-xl font-black text-center">
+	{$_("page.image.edit.title")}
+</div>
 
 <EditMeta {meta} />
-<Flex class="m-8" justify="center" align="center" gap="xl">
-	<Button type="submit" ripple on:click={onClick}
+<div class="m-8 flex items-center justify-center gap-4">
+	<Button size="sm" pill on:click={onClick}
 		>{$_("page.image.edit.do_edit")}</Button
 	>
-</Flex>
+</div>
 
 <code>
 	<pre>{#if image}{JSON.stringify(image, null, 2)}{/if}</pre>

@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { onMount, setContext } from "svelte";
+	import { onMount } from "svelte";
 	import { page } from "$app/stores";
 	import "../app.css";
-	import { Box, Center, Container, Footer, Loader } from "@svelteuidev/core";
 	import { GithubLogo, Underline } from "radix-icons-svelte";
+	import { Footer } from "flowbite-svelte";
 
 	let mounted = false;
 
@@ -14,31 +14,27 @@
 
 {#if mounted}
 	{#if $page.error}
-		<div
-			style="display: flex; height: 100vh; flex-direction: column; align-items: center; justify-content: center;"
-		>
+		<div class="flex min-h-screen flex-col items-center justify-center">
 			<slot />
 		</div>
 	{:else}
-		<Container class="md:w-2/3 w-full mx-auto">
+		<div class="w-full md:w-2/3 mx-auto">
 			<slot />
-			<Footer height={48} class="my-4">
-				<Center>
-					<Box class="my-4"
-						><strong>Imagio</strong> | Build with ♥️ at
-						<a
-							href="https://github.com/megrxu/imagio"
-							target="_blank"><u>GitHub</u></a
-						></Box
+			<Footer class="my-4">
+				<div
+					class="flex items-center justify-center py-4 text-sm text-gray-600 dark:text-gray-400 w-full"
+				>
+					<strong class="mr-1">Imagio</strong> | Build with ♥️ at
+					<a
+						class="ml-1 underline"
+						href="https://github.com/megrxu/imagio"
+						target="_blank"
+						rel="noreferrer">GitHub</a
 					>
-				</Center>
+				</div>
 			</Footer>
-		</Container>
+		</div>
 	{/if}
 {:else}
-	<div
-		style="display: flex; height: 100vh; flex-direction: column; align-items: center; justify-content: center;"
-	>
-		<Loader />
-	</div>
+	<div class="flex min-h-screen flex-col items-center justify-center"></div>
 {/if}
