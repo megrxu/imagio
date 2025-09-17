@@ -1,4 +1,4 @@
-import { SERVER_URL, ACCOUNT_ID, TOKEN } from '$env/static/private';
+import { SERVER_URL, ACCOUNT_ID, TOKEN } from '$lib/server/env';
 
 export async function DELETE({ fetch, params: { id } }) {
     const ENDPOINT = `${SERVER_URL}/${ACCOUNT_ID}/api/image/${id}`

@@ -1,4 +1,4 @@
-import { ACCOUNT_ID, SERVER_URL } from '$env/static/private';
+import { ACCOUNT_ID, SERVER_URL } from '$lib/server/env';
 
 export function GET({ fetch, url }) {
     let limit = parseInt(url.searchParams.get('limit') ?? '1')

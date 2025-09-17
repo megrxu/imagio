@@ -1,6 +1,6 @@
 import type { RemoteImage } from '$lib/types';
-import { ACCOUNT_ID, SERVER_URL } from '$env/static/private';
 import type { PageServerLoad } from './$types';
+import { ACCOUNT_ID, SERVER_URL } from '$lib/server/env';
 
 export const load: PageServerLoad = async ({ url }) => {
     let page = parseInt(url.searchParams.get('page') ?? '1')

@@ -6,7 +6,8 @@ export default defineConfig({
 	server: {
 		port: 5173,
 		hmr: {
-			clientPort: 5173,
+			clientPort: 5173
 		}
-	}
+	},
+	// Vite 5 defaults are fine; keep config minimal to reduce risk
 });
