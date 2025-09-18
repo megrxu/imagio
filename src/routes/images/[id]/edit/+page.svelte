@@ -24,17 +24,18 @@
 	};
 </script>
 
-<div class="m-8 text-xl font-black text-center">
-	{$_("page.image.edit.title")}
-</div>
+<h1 class="title-page text-center my-6">{$_("page.image.edit.title")}</h1>
 
 <EditMeta {meta} />
-<div class="m-8 flex items-center justify-center gap-4">
-	<Button size="sm" pill on:click={onClick}
-		>{$_("page.image.edit.do_edit")}</Button
-	>
+
+<div class="action-bar justify-center">
+	<Button size="sm" pill on:click={onClick}>
+		{$_("page.image.edit.do_edit")}
+	</Button>
 </div>
 
-<code>
-	<pre>{#if image}{JSON.stringify(image, null, 2)}{/if}</pre>
-</code>
+<div class="card mb-6">
+	<div class="card-body overflow-x-auto">
+		<pre class="text-xs whitespace-pre-wrap">{#if image}{JSON.stringify(image, null, 2)}{/if}</pre>
+	</div>
+</div>

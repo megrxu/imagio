@@ -18,7 +18,7 @@
 			<slot />
 		</div>
 	{:else}
-		<div class="w-full md:w-2/3 mx-auto">
+		<div class="container-app">
 			<slot />
 			<Footer class="my-4">
 				<div

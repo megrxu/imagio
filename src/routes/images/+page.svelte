@@ -60,7 +60,7 @@
 	};
 </script>
 
-<div class="m-8 text-xl font-black text-center">{$_("page.images.title")}</div>
+<h1 class="title-page my-6 text-center">{$_("page.images.title")}</h1>
 
 <EditMeta bind:meta />
 <div class="m-auto my-8 flex items-center justify-center gap-4">
@@ -159,7 +159,7 @@
 					size="xs"
 					class="p-1 hover:bg-transparent focus:ring-0"
 					title={$_("page.images.action.blob")}
-					><MagnifyingGlass class="text-blue-600" /></Button
+					><MagnifyingGlass class="text-gray-600" /></Button
 				>
 				<Button
 					tag="a"
@@ -168,7 +168,7 @@
 					size="xs"
 					class="p-1 hover:bg-transparent focus:ring-0"
 					title={$_("page.images.action.view")}
-					><InfoCircled class="text-blue-600" /></Button
+					><InfoCircled class="text-gray-600" /></Button
 				>
 				<Button
 					tag="a"
@@ -177,7 +177,7 @@
 					size="xs"
 					class="p-1 hover:bg-transparent focus:ring-0"
 					title={$_("page.images.action.edit")}
-					><Pencil2 class="text-amber-500" /></Button
+					><Pencil2 class="text-gray-500" /></Button
 				>
 				<Button
 					color="none"

@@ -6,10 +6,10 @@
 	$: ({ image } = data);
 </script>
 
-<div class="m-8 text-xl font-black text-center">
-	{$_("page.image.view.title")}
-</div>
+<h1 class="title-page text-center my-6">{$_("page.image.view.title")}</h1>
 
-<code>
-	<pre>{#if image}{JSON.stringify(image, null, 2)}{/if}</pre>
-</code>
+<div class="card mb-6">
+	<div class="card-body overflow-x-auto">
+		<pre class="text-xs whitespace-pre-wrap">{#if image}{JSON.stringify(image, null, 2)}{/if}</pre>
+	</div>
+</div>

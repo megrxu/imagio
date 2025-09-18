@@ -62,27 +62,29 @@
 	}
 </script>
 
-<div class="m-8 text-xl font-black text-center">{$_("page.upload.upload")}</div>
+<h1 class="title-page text-center my-6">{$_("page.upload.upload")}</h1>
 {#if alert}
 	<Alert color="red" class="mb-4">{alert}</Alert>
 {/if}
-<div class="mb-4">
+<div class="mb-4 card">
+	<div class="card-body">
 	<Label for="upload-category" class="mb-2">{$_("term.category")}</Label>
 	<Select id="upload-category" bind:value={category} class="w-full">
 		<option value="public">public</option>
 		<option value="private">private</option>
 	</Select>
+	</div>
 </div>
-<div class="m-8 flex items-center justify-center gap-4">
+<div class="action-bar justify-center">
 	<label for="uploads" class="cursor-pointer">
 		<Button size="sm" pill>{$_("page.upload.select")}</Button>
 	</label>
-	<a href={`/images`}
-		><Button size="sm" pill color="light">{$_("term.gallery")}</Button></a
-	>
-	<Button size="sm" pill color="green" on:click={doUpload}
-		>{$_("page.upload.upload")}</Button
-	>
+	<a href={`/images`}>
+		<Button size="sm" pill color="light">{$_("term.gallery")}</Button>
+	</a>
+	<Button size="sm" pill color="green" on:click={doUpload}>
+		{$_("page.upload.upload")}
+	</Button>
 	<input
 		multiple
 		class="hidden"
@@ -94,26 +96,24 @@
 	/>
 	>
 </div>
-{#if placeholder}
-	<label for="uploads" class="block w-full">
-		<Card
-			class="w-full h-96 flex items-center justify-center cursor-pointer"
-		>
-			{$_("page.upload.images_placeholder")}
-		</Card>
-	</label>
-{:else}
-	<div
-		class="grid grid-cols-2 md:grid-cols-4 gap-4 h-96 w-full overflow-y-auto"
-	>
-		{#each images as image}
-			<div>
-				<figure>
-					<img src={String(image.src)} alt="" />
-				</figure>
+<div class="card">
+	<div class="card-body">
+		{#if placeholder}
+			<label for="uploads" class="block w-full cursor-pointer h-96 flex items-center justify-center text-muted">
+				{$_("page.upload.images_placeholder")}
+			</label>
+		{:else}
+			<div class="grid grid-cols-2 md:grid-cols-4 gap-4 h-96 w-full overflow-y-auto">
+				{#each images as image}
+					<div>
+						<figure>
+							<img src={String(image.src)} alt="" class="rounded-md" />
+						</figure>
+					</div>
+				{/each}
 			</div>
-		{/each}
+		{/if}
 	</div>
-{/if}
+</div>
 
 <SubmitProgress doing={uploading} done={uploaded} />

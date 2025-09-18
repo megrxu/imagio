@@ -7,8 +7,8 @@
     export let meta: ImageMetaData;
 </script>
 
-<div class="m-8 w-full">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="m-4 w-full card">
+    <div class="card-body grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
             <Label for="meta-category" class="mb-2">{$_("term.category")}</Label
             >

@@ -1,0 +1,46 @@
+/* Lightweight shared style primitives (no base component library) */
+@layer components {
+  /* Container sizing */
+  .container-app {
+    @apply w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Card shell */
+  .card {
+    @apply bg-[rgb(var(--surface))] text-[rgb(var(--surface-foreground))] rounded-sm shadow-sm border border-[rgb(var(--border))];
+  }
+  .card-body {
+    @apply p-4 sm:p-6;
+  }
+
+  /* Titles */
+  .title-page {
+    @apply text-2xl font-semibold tracking-tight text-[rgb(var(--surface-foreground))];
+  }
+  .title-section {
+    @apply text-lg font-medium text-[rgb(var(--surface-foreground))];
+  }
+
+  /* Text helpers */
+  .text-muted { @apply text-[rgb(var(--muted))]; }
+
+  /* Inputs: rely on Flowbite structure, just unify ring and radius */
+  .input {
+    @apply rounded-md ring-1 ring-inset ring-[rgb(var(--border))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ring))] bg-[rgb(var(--surface))] text-[rgb(var(--surface-foreground))];
+  }
+
+  /* Buttons: complement Flowbite variants */
+  .btn-base { @apply inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]; }
+  .btn-primary { @apply btn-base bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary))]/90; }
+  .btn-secondary { @apply btn-base bg-[rgb(var(--color-secondary))] text-white hover:bg-[rgb(var(--color-secondary))]/90; }
+  .btn-ghost { @apply btn-base bg-transparent text-[rgb(var(--surface-foreground))] hover:bg-[rgb(var(--border))]/40; }
+
+  /* Badges */
+  .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ring-[rgb(var(--border))] bg-[rgb(var(--surface))]/60 text-[rgb(var(--muted))]; }
+  .badge-success { @apply text-white bg-[rgb(var(--color-success))]; }
+  .badge-warning { @apply text-white bg-[rgb(var(--color-warning))]; }
+  .badge-danger { @apply text-white bg-[rgb(var(--color-danger))]; }
+
+  /* Horizontal action bar for groups of buttons/filters */
+  .action-bar { @apply flex flex-wrap items-center gap-3 my-4; }
+}
