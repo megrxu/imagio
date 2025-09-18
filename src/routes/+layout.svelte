@@ -4,6 +4,7 @@
 	import "../app.css";
 	import { GithubLogo, Underline } from "radix-icons-svelte";
 	import { Footer } from "flowbite-svelte";
+	import NotificationHost from "$lib/ui/NotificationHost.svelte";
 
 	let mounted = false;
 
@@ -20,6 +21,11 @@
 	{:else}
 		<div class="container-app">
 			<slot />
+			<!-- Global notifications -->
+			<div class="pointer-events-none">
+				<!-- pointer-events restored inside toast cards -->
+				<svelte:component this={NotificationHost} />
+			</div>
 			<Footer class="my-4">
 				<div
 					class="flex items-center justify-center py-4 text-sm text-gray-600 dark:text-gray-400 w-full"

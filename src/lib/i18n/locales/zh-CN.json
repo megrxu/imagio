@@ -40,7 +40,14 @@
     },
     "general": {
         "notification": {
-            "alert": "注意！"
+            "alert": "注意！",
+            "delete_confirm_title": "确认删除",
+            "delete_confirm_message_single": "确定要删除这张图片吗？该操作不可撤销。",
+            "delete_confirm_message_batch": "确定要删除选中的 {count} 张图片吗？该操作不可撤销。",
+            "delete_ok": "删除成功",
+            "delete_failed": "删除失败",
+            "cancel": "取消",
+            "confirm": "确认"
         }
     }
 }
