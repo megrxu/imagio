@@ -190,15 +190,11 @@ export async function GET({ request, params: { id, variant }, platform }) {
 
     const legacyCategoryAlias = normalizedVariant === 'public' || normalizedVariant === 'private' ? normalizedVariant : null;
     const effectiveVariant = legacyCategoryAlias ? 'original' : normalizedVariant;
-    let imageCategory = legacyCategoryAlias;
-
-    if (!imageCategory) {
-        const image = await getImageById(platform, id);
-        if (!image) {
-            return new Response('Not found', { status: 404 });
-        }
-        imageCategory = image.category;
+    const image = await getImageById(platform, id, legacyCategoryAlias ?? undefined);
+    if (!image) {
+        return new Response('Not found', { status: 404 });
     }
+    const imageCategory = image.category;
 
     if (imageCategory === 'private') {
         const referer = request.headers.get('referer');
