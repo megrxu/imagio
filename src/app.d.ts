@@ -5,12 +5,17 @@ import { D1Database, R2Bucket } from '@cloudflare/workers-types';
 
 declare global {
 	namespace App {
+		interface AssetsBinding {
+			fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+		}
+
 		interface Platform {
 			env?: {
 				ACCOUNT_ID?: string;
 				SERVER_URL?: string;
 				TOKEN?: string;
 				S3_PUBLIC_ACCESS_ENDPOINT?: string;
+				ASSETS?: AssetsBinding;
 				IMAGIO_R2?: R2Bucket;
 				IMAGIO_DB?: D1Database;
 			};

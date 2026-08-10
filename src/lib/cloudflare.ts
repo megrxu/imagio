@@ -349,41 +349,51 @@ function normalizeLegacyRow(row: Record<string, unknown>, idColumn: "uuid" | "id
 }
 
 export async function listLegacyImagesByCategory(platform: PlatformLike, category: string): Promise<RemoteImage[]> {
-	const db = getD1Database(platform);
-	if (!db) return [];
+	try {
+		const db = getD1Database(platform);
+		if (!db) return [];
 
-	const legacy = await discoverLegacyTable(db);
-	if (!legacy) return [];
+		const legacy = await discoverLegacyTable(db);
+		if (!legacy) return [];
 
-	const tableName = quoteIdentifier(legacy.name);
-	const rows = await runAll<Record<string, unknown>>(
-		db,
-		`SELECT * FROM ${tableName} WHERE category = ?`,
-		[category],
-	);
+		const tableName = quoteIdentifier(legacy.name);
+		const rows = await runAll<Record<string, unknown>>(
+			db,
+			`SELECT * FROM ${tableName} WHERE category = ?`,
+			[category],
+		);
 
-	return sortImagesByUploadedAt(
-		rows
-			.map((row) => normalizeLegacyRow(row, legacy.idColumn))
-			.filter((item): item is RemoteImage => Boolean(item))
-	);
+		return sortImagesByUploadedAt(
+			rows
+				.map((row) => normalizeLegacyRow(row, legacy.idColumn))
+				.filter((item): item is RemoteImage => Boolean(item))
+		);
+	} catch (error) {
+		console.error("listLegacyImagesByCategory failed", error);
+		return [];
+	}
 }
 
 export async function getLegacyImageById(platform: PlatformLike, id: string, categoryHint?: string): Promise<RemoteImage | null> {
-	const db = getD1Database(platform);
-	if (!db) return null;
+	try {
+		const db = getD1Database(platform);
+		if (!db) return null;
 
-	const legacy = await discoverLegacyTable(db);
-	if (!legacy) return null;
+		const legacy = await discoverLegacyTable(db);
+		if (!legacy) return null;
 
-	const tableName = quoteIdentifier(legacy.name);
-	const idColumn = quoteIdentifier(legacy.idColumn);
-	const sql = categoryHint
-		? `SELECT * FROM ${tableName} WHERE ${idColumn} = ? AND category = ? LIMIT 1`
-		: `SELECT * FROM ${tableName} WHERE ${idColumn} = ? LIMIT 1`;
-	const row = await runFirst<Record<string, unknown>>(db, sql, categoryHint ? [id, categoryHint] : [id]);
-	if (!row) return null;
-	return normalizeLegacyRow(row, legacy.idColumn);
+		const tableName = quoteIdentifier(legacy.name);
+		const idColumn = quoteIdentifier(legacy.idColumn);
+		const sql = categoryHint
+			? `SELECT * FROM ${tableName} WHERE ${idColumn} = ? AND category = ? LIMIT 1`
+			: `SELECT * FROM ${tableName} WHERE ${idColumn} = ? LIMIT 1`;
+		const row = await runFirst<Record<string, unknown>>(db, sql, categoryHint ? [id, categoryHint] : [id]);
+		if (!row) return null;
+		return normalizeLegacyRow(row, legacy.idColumn);
+	} catch (error) {
+		console.error("getLegacyImageById failed", error);
+		return null;
+	}
 }
 
 function getLegacyS3BaseUrl(platform: PlatformLike): string | undefined {
@@ -499,25 +509,31 @@ export async function listImagesPage(
 	limit: number,
 	cursor?: string,
 ): Promise<ImageListPage> {
-	const fromR2 = await listR2ImagesPageByCategory(platform, category, limit, cursor);
-	if (fromR2.items.length > 0 || fromR2.nextCursor) {
-		return fromR2;
-	}
+	try {
+		const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(200, Math.floor(limit))) : 24;
+		const fromR2 = await listR2ImagesPageByCategory(platform, category, safeLimit, cursor);
+		if (fromR2.items.length > 0 || fromR2.nextCursor) {
+			return fromR2;
+		}
 
-	if (cursor) {
+		if (cursor) {
+			return { items: [], nextCursor: null, source: "empty" };
+		}
+
+		const fromD1 = await listLegacyImagesByCategory(platform, category);
+		if (fromD1.length > 0) {
+			return {
+				items: fromD1.slice(0, safeLimit),
+				nextCursor: null,
+				source: "d1-fallback",
+			};
+		}
+
+		return { items: [], nextCursor: null, source: "empty" };
+	} catch (error) {
+		console.error("listImagesPage failed", error);
 		return { items: [], nextCursor: null, source: "empty" };
 	}
-
-	const fromD1 = await listLegacyImagesByCategory(platform, category);
-	if (fromD1.length > 0) {
-		return {
-			items: fromD1.slice(0, limit),
-			nextCursor: null,
-			source: "d1-fallback",
-		};
-	}
-
-	return { items: [], nextCursor: null, source: "empty" };
 }
 
 export async function listImagesFromRegistry(platform: PlatformLike, category: string): Promise<RemoteImage[]> {
@@ -530,41 +546,46 @@ export async function getImageById(
 	id: string,
 	categoryHint?: string,
 ): Promise<RemoteImage | null> {
-	if (categoryHint) {
-		const key = buildObjectKey(categoryHint, id, "original");
-		const object = await getR2Bucket(platform)?.get(key);
-		if (object?.body) {
+	try {
+		if (categoryHint) {
+			const key = buildObjectKey(categoryHint, id, "original");
+			const object = await getR2Bucket(platform)?.get(key);
+			if (object?.body) {
+				return normalizeRemoteImage({
+					uuid: id,
+					category: categoryHint,
+					name: object.customMetadata?.originalName ?? id,
+					uploadedAt: object.customMetadata?.uploadedAt,
+					meta: {
+						tags: parseTags(object.customMetadata?.tags),
+						category: categoryHint,
+					},
+				});
+			}
+		}
+
+		const categories = categoryHint ? [categoryHint] : defaultCategoryCandidates;
+		for (const category of categories) {
+			const key = buildObjectKey(category, id, "original");
+			const object = await getR2Bucket(platform)?.get(key);
+			if (!object?.body) continue;
 			return normalizeRemoteImage({
 				uuid: id,
-				category: categoryHint,
+				category,
 				name: object.customMetadata?.originalName ?? id,
 				uploadedAt: object.customMetadata?.uploadedAt,
 				meta: {
 					tags: parseTags(object.customMetadata?.tags),
-					category: categoryHint,
+					category,
 				},
 			});
 		}
-	}
 
-	const categories = categoryHint ? [categoryHint] : defaultCategoryCandidates;
-	for (const category of categories) {
-		const key = buildObjectKey(category, id, "original");
-		const object = await getR2Bucket(platform)?.get(key);
-		if (!object?.body) continue;
-		return normalizeRemoteImage({
-			uuid: id,
-			category,
-			name: object.customMetadata?.originalName ?? id,
-			uploadedAt: object.customMetadata?.uploadedAt,
-			meta: {
-				tags: parseTags(object.customMetadata?.tags),
-				category,
-			},
-		});
+		return await getLegacyImageById(platform, id, categoryHint);
+	} catch (error) {
+		console.error("getImageById failed", error);
+		return null;
 	}
-
-	return await getLegacyImageById(platform, id, categoryHint);
 }
 
 export async function deleteImageFromCloudflare(platform: PlatformLike, id: string): Promise<void> {

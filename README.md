@@ -23,3 +23,16 @@ Imagio provides the following endpoints:
 
 - `/upload`: to upload images.
 - `/images`: to list and modify uploaded images.
+
+## Local Cloudflare Runtime
+
+Run the app with Cloudflare Worker runtime (including static assets binding, R2, D1 bindings):
+
+1. Install dependencies: `pnpm install`
+2. Start local worker runtime: `pnpm dev:cf`
+3. Open: `http://127.0.0.1:8788/images`
+
+Notes:
+
+- Local runtime config is in `wrangler.local.toml` (does not affect normal deployment flow).
+- To override local env vars, copy `.dev.vars.example` to `.dev.vars` and edit values.

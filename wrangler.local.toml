@@ -1,0 +1,23 @@
+name = "imagio-local"
+main = ".svelte-kit/cloudflare/_worker.js"
+compatibility_date = "2026-08-08"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = ".svelte-kit/output/client"
+binding = "ASSETS"
+
+[vars]
+S3_PUBLIC_ACCESS_ENDPOINT = ""
+TOKEN = "local-dev-token"
+
+[[r2_buckets]]
+binding = "IMAGIO_R2"
+bucket_name = "imagio-local"
+preview_bucket_name = "imagio-local"
+
+[[d1_databases]]
+binding = "IMAGIO_DB"
+database_name = "imagio-local"
+database_id = "00000000-0000-0000-0000-000000000001"
+preview_database_id = "00000000-0000-0000-0000-000000000001"

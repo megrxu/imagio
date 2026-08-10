@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
+    "build:cf": "vite build",
+    "dev:cf": "vite build && wrangler dev --config wrangler.local.toml --local --ip 127.0.0.1 --port 8788 --log-level debug",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
@@ -22,7 +24,8 @@
     "tailwindcss": "^3.4.17",
     "tslib": "^2.8.1",
     "typescript": "^5.9.2",
-    "vite": "^7.1.5"
+    "vite": "^7.1.5",
+    "wrangler": "^4.120.0"
   },
   "type": "module",
   "dependencies": {

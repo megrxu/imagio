@@ -1,0 +1,8 @@
+# Copy this file to .dev.vars for local wrangler runtime overrides
+# cp .dev.vars.example .dev.vars
+
+# Optional: legacy object fallback endpoint
+# S3_PUBLIC_ACCESS_ENDPOINT=https://your-legacy-endpoint.example.com
+
+# Optional: admin auth token used by /admin routes
+# TOKEN=replace-with-local-token
