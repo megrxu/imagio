@@ -98,8 +98,8 @@ function buildTransformOptions(variant: string, request: Request, searchParams: 
     return options;
 }
 
-function buildVariantCacheKey(category: string, id: string, variant: string, transformOptions: Record<string, string | number> | null) {
-    const base = `images/${category}/${id}/${variant}`;
+function buildVariantCacheKey(id: string, variant: string, transformOptions: Record<string, string | number> | null) {
+    const base = `images/${id}/${variant}`;
     if (!transformOptions) {
         return base;
     }
@@ -117,6 +117,31 @@ function buildVariantCacheKey(category: string, id: string, variant: string, tra
     return `${base}/${format}`;
 }
 
+function buildLegacySourceCandidates(id: string, category: string, originalName?: string) {
+    const candidates = new Set<string>();
+    const normalizedCategory = category?.trim() || 'public';
+    const basePrefix = `images/${normalizedCategory}`;
+    const extensions = ['JPEG', 'PNG'];
+
+    for (const ext of extensions) {
+        candidates.add(`${basePrefix}/${id}.${ext}`);
+    }
+    candidates.add(`${basePrefix}/${id}`);
+    candidates.add(`${basePrefix}/${id}/original`);
+
+    if (typeof originalName === 'string') {
+        const trimmed = originalName.trim();
+        if (trimmed) {
+            candidates.add(`${basePrefix}/${trimmed}`);
+            for (const ext of extensions) {
+                candidates.add(`${basePrefix}/${trimmed}.${ext}`);
+            }
+        }
+    }
+
+    return [...candidates];
+}
+
 async function getOrRenderVariant(
     platform: any,
     request: Request,
@@ -130,7 +155,7 @@ async function getOrRenderVariant(
         return null;
     }
 
-    const cacheKey = buildVariantCacheKey(category, id, variant, transformOptions);
+    const cacheKey = buildVariantCacheKey(id, variant, transformOptions);
     const cached = await bucket.get(cacheKey);
     if (cached?.body) {
         return {
@@ -219,11 +244,13 @@ export async function GET({ request, params: { id, variant }, platform }) {
 
     const isInternalSource = request.headers.get('x-imagio-internal-source') === '1';
     const requestedKey = isInternalSource
-        ? `images/${imageCategory}/${id}/original`
-        : `images/${imageCategory}/${id}/${effectiveVariant}`;
+        ? `images/${id}/original`
+        : `images/${id}/${effectiveVariant}`;
     const candidates = [
         requestedKey,
-        !isInternalSource && effectiveVariant !== 'original' ? `images/${imageCategory}/${id}/original` : null,
+        !isInternalSource && effectiveVariant !== 'original' ? `images/${id}/original` : null,
+        `images/${imageCategory}/${id}/original`,
+        !isInternalSource && effectiveVariant !== 'original' ? `images/${imageCategory}/${id}/${effectiveVariant}` : null,
     ].filter(Boolean) as string[];
 
     const transformOptions = buildTransformOptions(effectiveVariant, request, new URL(request.url).searchParams);
@@ -250,14 +277,15 @@ export async function GET({ request, params: { id, variant }, platform }) {
     for (const key of candidates) {
         const object = await getOrMigrateObject(platform, key, {
             migrateFromLegacy: key.endsWith('/original'),
-            legacySourceKeys: [
-                `${id}/${imageCategory}`,
-                `${id}/${imageCategory}.jpg`,
-                `${id}/${imageCategory}.jpeg`,
-                `${id}/${imageCategory}.png`,
-                legacyCategoryAlias ? `${id}/${legacyCategoryAlias}` : '',
-                legacyCategoryAlias ? `${id}/${legacyCategoryAlias}.jpg` : '',
-            ].filter(Boolean),
+            legacySourceKeys: buildLegacySourceCandidates(
+                id,
+                imageCategory,
+                image.name,
+            ).concat(
+                legacyCategoryAlias
+                    ? buildLegacySourceCandidates(id, legacyCategoryAlias, image.name)
+                    : [],
+            ),
         });
         if (object?.body) {
             const headers = new Headers();

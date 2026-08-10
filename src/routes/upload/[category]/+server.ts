@@ -8,7 +8,19 @@ export async function PUT({ request, params: { category }, platform }) {
     }
 
     try {
-        const image = await uploadImageToCloudflare(file, category, platform);
+        const rawId = formData.get('id');
+        const rawUuid = formData.get('uuid');
+        const requestedId = rawId instanceof File
+            ? undefined
+            : typeof rawId === 'string'
+                ? rawId.trim()
+                : rawUuid instanceof File
+                    ? undefined
+                    : typeof rawUuid === 'string'
+                        ? rawUuid.trim()
+                        : undefined;
+
+        const image = await uploadImageToCloudflare(file, category, platform, undefined, requestedId);
         return new Response(JSON.stringify(image), {
             headers: {
                 'content-type': 'application/json; charset=utf-8',

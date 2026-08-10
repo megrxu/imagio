@@ -64,7 +64,7 @@ export type ImageListPage = {
 	source: "r2" | "d1-fallback" | "empty";
 };
 
-const legacyTableCacheKey = "__imagio_legacy_table_info";
+const fixedLegacyTable: LegacyTableInfo = { name: "images", idColumn: "uuid" };
 const defaultCategoryCandidates = ["public", "private"];
 
 function getEnv(platform: PlatformLike): CloudflareEnv {
@@ -99,12 +99,42 @@ export function isAdminRequest(request: Request, platform: PlatformLike): boolea
 	return auth === `Bearer ${token}`;
 }
 
-function buildObjectKey(category: string, id: string, variant = "original") {
-	return `images/${category}/${id}/${variant}`;
+export function buildObjectKey(id: string, variant = "original") {
+	return `images/${id}/${variant}`;
+}
+
+function buildLegacyObjectKey(id: string, variant = "original", category?: string) {
+	const normalizedCategory = category?.trim();
+	return normalizedCategory ? `images/${normalizedCategory}/${id}/${variant}` : `images/${id}/${variant}`;
 }
 
 function buildPublicUrl(id: string, variant = "original") {
 	return `/delivery/${id}/${variant}`;
+}
+
+function buildLegacySourceCandidates(id: string, category: string, originalName?: string): string[] {
+	const candidates = new Set<string>();
+	const normalizedCategory = category?.trim() || "public";
+	const basePrefix = `images/${normalizedCategory}`;
+	const extensions = ["JPEG", "PNG"];
+
+	for (const ext of extensions) {
+		candidates.add(`${basePrefix}/${id}.${ext}`);
+	}
+	candidates.add(`${basePrefix}/${id}`);
+	candidates.add(`${basePrefix}/${id}/original`);
+
+	if (typeof originalName === "string") {
+		const trimmed = originalName.trim();
+		if (trimmed) {
+			candidates.add(`${basePrefix}/${trimmed}`);
+			for (const ext of extensions) {
+				candidates.add(`${basePrefix}/${trimmed}.${ext}`);
+			}
+		}
+	}
+
+	return [...candidates];
 }
 
 function parseTags(value: unknown): string[] {
@@ -147,10 +177,18 @@ function sortImagesByUploadedAt(images: RemoteImage[]): RemoteImage[] {
 	return [...images].sort((a, b) => (b.uploadedAt ?? "").localeCompare(a.uploadedAt ?? ""));
 }
 
-function parseOriginalKey(key: string): { category: string; uuid: string } | null {
+function parseOriginalKey(key: string): { category?: string; uuid: string } | null {
 	const match = key.match(/^images\/([^/]+)\/([^/]+)\/original$/i);
-	if (!match) return null;
-	return { category: match[1], uuid: match[2] };
+	if (match) {
+		return { category: match[1], uuid: match[2] };
+	}
+
+	const simpleMatch = key.match(/^images\/([^/]+)\/original$/i);
+	if (simpleMatch) {
+		return { uuid: simpleMatch[1] };
+	}
+
+	return null;
 }
 
 function getUploadedIso(uploaded?: Date | string, customUploadedAt?: string) {
@@ -162,19 +200,38 @@ function getUploadedIso(uploaded?: Date | string, customUploadedAt?: string) {
 	return uploaded;
 }
 
+function toIsoIfEpoch(input: unknown): string | null {
+	if (typeof input === "number" && Number.isFinite(input) && input > 0) {
+		return new Date(input).toISOString();
+	}
+	if (typeof input === "string") {
+		const trimmed = input.trim();
+		if (!trimmed) return null;
+		if (/^\d+$/.test(trimmed)) {
+			const value = Number(trimmed);
+			if (Number.isFinite(value) && value > 0) {
+				return new Date(value).toISOString();
+			}
+		}
+		return trimmed;
+	}
+	return null;
+}
+
 function imageFromListObject(item: R2ListObjectLike): RemoteImage | null {
 	const parsed = parseOriginalKey(item.key);
 	if (!parsed) return null;
 	const tags = parseTags(item.customMetadata?.tags);
 	const categoryFromMeta = item.customMetadata?.category;
+	const resolvedCategory = categoryFromMeta || parsed.category || "public";
 	return normalizeRemoteImage({
 		uuid: parsed.uuid,
-		category: categoryFromMeta || parsed.category,
+		category: resolvedCategory,
 		name: item.customMetadata?.originalName || parsed.uuid,
 		uploadedAt: getUploadedIso(item.uploaded, item.customMetadata?.uploadedAt),
 		meta: {
 			tags,
-			category: categoryFromMeta || parsed.category,
+			category: resolvedCategory,
 		},
 	});
 }
@@ -200,7 +257,7 @@ async function listR2ImagesPageByCategory(
 	while (items.length < limit && truncated && loops < maxLoops) {
 		loops += 1;
 		const response = await bucket.list({
-			prefix: `images/${category}/`,
+			prefix: "images/",
 			limit: Math.max(limit * 2, 50),
 			cursor: nextCursor,
 		});
@@ -208,6 +265,7 @@ async function listR2ImagesPageByCategory(
 		for (const object of response.objects) {
 			const image = imageFromListObject(object);
 			if (!image) continue;
+			if (image.category !== category) continue;
 			if (seen.has(image.uuid)) continue;
 			seen.add(image.uuid);
 			items.push(image);
@@ -257,59 +315,15 @@ async function runFirst<T = Record<string, unknown>>(
 	return await bound.first<T>();
 }
 
-function getLegacyTableCache(): LegacyTableInfo | null | undefined {
-	const globalScope = globalThis as typeof globalThis & {
-		[legacyTableCacheKey]?: LegacyTableInfo | null;
-	};
-	return globalScope[legacyTableCacheKey];
-}
-
-function setLegacyTableCache(info: LegacyTableInfo | null) {
-	const globalScope = globalThis as typeof globalThis & {
-		[legacyTableCacheKey]?: LegacyTableInfo | null;
-	};
-	globalScope[legacyTableCacheKey] = info;
-}
-
-async function discoverLegacyTable(db: D1DatabaseLike): Promise<LegacyTableInfo | null> {
-	const cached = getLegacyTableCache();
-	if (cached !== undefined) {
-		return cached;
+async function discoverLegacyTable(platform: PlatformLike, db: D1DatabaseLike): Promise<LegacyTableInfo | null> {
+	void platform;
+	try {
+		// Legacy schema is fixed by design.
+		await runAll(db, `SELECT ${quoteIdentifier(fixedLegacyTable.idColumn)} FROM ${quoteIdentifier(fixedLegacyTable.name)} LIMIT 1`);
+		return fixedLegacyTable;
+	} catch {
+		return null;
 	}
-
-	const tables = await runAll<{ name: string }>(
-		db,
-		"SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
-	);
-
-	for (const table of tables) {
-		if (!table.name || !safeIdentifier(table.name)) continue;
-		if (table.name === "imagio_images") {
-			const info: LegacyTableInfo = { name: table.name, idColumn: "uuid" };
-			setLegacyTableCache(info);
-			return info;
-		}
-	}
-
-	for (const table of tables) {
-		if (!table.name || !safeIdentifier(table.name)) continue;
-		const pragma = await runAll<{ name: string }>(db, `PRAGMA table_info(${quoteIdentifier(table.name)})`);
-		const columns = new Set(pragma.map((item) => item.name));
-		if (!columns.has("category")) continue;
-		if (columns.has("uuid")) {
-			const info: LegacyTableInfo = { name: table.name, idColumn: "uuid" };
-			setLegacyTableCache(info);
-			return info;
-		}
-		if (columns.has("id")) {
-			const info: LegacyTableInfo = { name: table.name, idColumn: "id" };
-			setLegacyTableCache(info);
-			return info;
-		}
-	}
-
-	setLegacyTableCache(null);
-	return null;
 }
 
 function normalizeLegacyRow(row: Record<string, unknown>, idColumn: "uuid" | "id"): RemoteImage | null {
@@ -319,11 +333,7 @@ function normalizeLegacyRow(row: Record<string, unknown>, idColumn: "uuid" | "id
 	const category = typeof row.category === "string" && row.category ? row.category : "public";
 	const name = typeof row.name === "string" && row.name ? row.name : rawId;
 	const uploadedAt =
-		typeof row.uploaded_at === "string" && row.uploaded_at
-			? row.uploaded_at
-			: typeof row.create_time === "string" && row.create_time
-				? row.create_time
-				: new Date().toISOString();
+		toIsoIfEpoch(row.uploaded_at) ?? toIsoIfEpoch(row.create_time) ?? new Date().toISOString();
 
 	let tags: string[] = [];
 	let metaCategory = category;
@@ -339,12 +349,13 @@ function normalizeLegacyRow(row: Record<string, unknown>, idColumn: "uuid" | "id
 		tags = parseTags(row.tags);
 	}
 
+	const resolvedCategory = metaCategory || category || "public";
 	return normalizeRemoteImage({
 		uuid: rawId,
-		category,
+		category: resolvedCategory,
 		name,
 		uploadedAt,
-		meta: { tags, category: metaCategory },
+		meta: { tags, category: resolvedCategory },
 	});
 }
 
@@ -353,7 +364,7 @@ export async function listLegacyImagesByCategory(platform: PlatformLike, categor
 		const db = getD1Database(platform);
 		if (!db) return [];
 
-		const legacy = await discoverLegacyTable(db);
+		const legacy = await discoverLegacyTable(platform, db);
 		if (!legacy) return [];
 
 		const tableName = quoteIdentifier(legacy.name);
@@ -379,7 +390,7 @@ export async function getLegacyImageById(platform: PlatformLike, id: string, cat
 		const db = getD1Database(platform);
 		if (!db) return null;
 
-		const legacy = await discoverLegacyTable(db);
+		const legacy = await discoverLegacyTable(platform, db);
 		if (!legacy) return null;
 
 		const tableName = quoteIdentifier(legacy.name);
@@ -397,11 +408,11 @@ export async function getLegacyImageById(platform: PlatformLike, id: string, cat
 }
 
 function getLegacyS3BaseUrl(platform: PlatformLike): string | undefined {
-	const base = getEnv(platform).S3_PUBLIC_ACCESS_ENDPOINT;
-	if (typeof base === "string" && base.trim()) {
-		return base.trim();
+	const configured = getEnv(platform).S3_PUBLIC_ACCESS_ENDPOINT;
+	if (typeof configured === "string" && configured.trim()) {
+		return configured.trim();
 	}
-	return undefined;
+	return "https://imagio.r2.xugr.me";
 }
 
 async function tryReadLegacyObject(platform: PlatformLike, sourceKey: string): Promise<{ body: ArrayBuffer; contentType?: string } | null> {
@@ -467,14 +478,15 @@ export async function uploadImageToCloudflare(
 	category: string,
 	platform: PlatformLike,
 	metadata?: ImageMetaData,
+	requestedId?: string,
 ): Promise<RemoteImage> {
 	const bucket = getR2Bucket(platform);
 	if (!bucket) {
 		throw new Error("R2 bucket binding is not configured.");
 	}
 
-	const id = crypto.randomUUID();
-	const key = buildObjectKey(category, id, "original");
+	const id = (requestedId ?? "").trim() || crypto.randomUUID();
+	const key = buildObjectKey(id, "original");
 	const uploadedAt = new Date().toISOString();
 	const tags = metadata?.tags ?? [];
 
@@ -547,41 +559,71 @@ export async function getImageById(
 	categoryHint?: string,
 ): Promise<RemoteImage | null> {
 	try {
+		const canonicalKey = buildObjectKey(id, "original");
+		const keyCandidates = [canonicalKey];
 		if (categoryHint) {
-			const key = buildObjectKey(categoryHint, id, "original");
-			const object = await getR2Bucket(platform)?.get(key);
-			if (object?.body) {
-				return normalizeRemoteImage({
-					uuid: id,
-					category: categoryHint,
-					name: object.customMetadata?.originalName ?? id,
-					uploadedAt: object.customMetadata?.uploadedAt,
-					meta: {
-						tags: parseTags(object.customMetadata?.tags),
-						category: categoryHint,
-					},
-				});
-			}
+			keyCandidates.push(buildLegacyObjectKey(id, "original", categoryHint));
 		}
-
-		const categories = categoryHint ? [categoryHint] : defaultCategoryCandidates;
-		for (const category of categories) {
-			const key = buildObjectKey(category, id, "original");
+		for (const category of defaultCategoryCandidates) {
+			if (categoryHint && category === categoryHint) continue;
+			keyCandidates.push(buildLegacyObjectKey(id, "original", category));
+		}
+		for (const key of keyCandidates) {
 			const object = await getR2Bucket(platform)?.get(key);
 			if (!object?.body) continue;
+			const resolvedCategory = object.customMetadata?.category || categoryHint || "public";
 			return normalizeRemoteImage({
 				uuid: id,
-				category,
+				category: resolvedCategory,
 				name: object.customMetadata?.originalName ?? id,
 				uploadedAt: object.customMetadata?.uploadedAt,
 				meta: {
 					tags: parseTags(object.customMetadata?.tags),
-					category,
+					category: resolvedCategory,
 				},
 			});
 		}
 
-		return await getLegacyImageById(platform, id, categoryHint);
+		const legacyCandidates = Array.from(
+			new Set(
+				(defaultCategoryCandidates.concat(categoryHint ? [categoryHint] : [])).flatMap((category) =>
+					buildLegacySourceCandidates(id, category, undefined),
+			),
+			),
+		);
+		const migrated = await getOrMigrateObject(platform, canonicalKey, {
+			migrateFromLegacy: true,
+			legacySourceKeys: legacyCandidates,
+		});
+		if (migrated?.body) {
+			const resolvedCategory = categoryHint || "public";
+			return normalizeRemoteImage({
+				uuid: id,
+				category: resolvedCategory,
+				name: id,
+				uploadedAt: undefined,
+				meta: {
+					tags: [],
+					category: resolvedCategory,
+				},
+			});
+		}
+
+		const legacyByHint = await getLegacyImageById(platform, id, categoryHint);
+		if (legacyByHint) {
+			return legacyByHint;
+		}
+
+		if (categoryHint) {
+			// Some historical rows have mismatched/dirty category values.
+			// Retry without category constraint for backward compatibility.
+			const legacyById = await getLegacyImageById(platform, id);
+			if (legacyById) {
+				return legacyById;
+			}
+		}
+
+		return null;
 	} catch (error) {
 		console.error("getImageById failed", error);
 		return null;
@@ -652,7 +694,7 @@ export async function updateImageMetadata(
 			await bucket.delete(item.key);
 		}
 	} else if (bucket) {
-		const originalKey = buildObjectKey(existing.category, id, "original");
+		const originalKey = buildObjectKey(id, "original");
 		const object = await bucket.get(originalKey);
 		if (object?.body) {
 			await bucket.put(originalKey, object.body, {
@@ -687,6 +729,12 @@ export async function migrateLegacyD1ToR2(platform: PlatformLike): Promise<{
 	migrated: number;
 	skipped: number;
 	categories: string[];
+	diagnostic?: {
+		r2AlreadyPresent: number;
+		legacyFetchSuccess: number;
+		legacyFetchMiss: number;
+		sampleMisses: Array<{ id: string; category: string; attempted: string[] }>;
+	};
 }> {
 	const bucket = getR2Bucket(platform);
 	if (!bucket) {
@@ -698,7 +746,7 @@ export async function migrateLegacyD1ToR2(platform: PlatformLike): Promise<{
 		return { total: 0, migrated: 0, skipped: 0, categories: [] };
 	}
 
-	const legacy = await discoverLegacyTable(db);
+	const legacy = await discoverLegacyTable(platform, db);
 	if (!legacy) {
 		return { total: 0, migrated: 0, skipped: 0, categories: [] };
 	}
@@ -712,21 +760,32 @@ export async function migrateLegacyD1ToR2(platform: PlatformLike): Promise<{
 	let migrated = 0;
 	let skipped = 0;
 	const categories = new Set<string>();
+	let r2AlreadyPresent = 0;
+	let legacyFetchSuccess = 0;
+	let legacyFetchMiss = 0;
+	const sampleMisses: Array<{ id: string; category: string; attempted: string[] }> = [];
 
 	for (const image of images) {
 		categories.add(image.category);
-		const key = buildObjectKey(image.category, image.uuid, "original");
+		const key = buildObjectKey(image.uuid, "original");
 		let object = await bucket.get(key);
+		if (object?.body) {
+			r2AlreadyPresent += 1;
+		}
 		if (!object?.body) {
+			const attempted = buildLegacySourceCandidates(image.uuid, image.category, image.name);
 			object = await getOrMigrateObject(platform, key, {
 				migrateFromLegacy: true,
-				legacySourceKeys: [
-					`${image.uuid}/${image.category}`,
-					`${image.uuid}/${image.category}.jpg`,
-					`${image.uuid}/${image.category}.jpeg`,
-					`${image.uuid}/${image.category}.png`,
-				],
+				legacySourceKeys: attempted,
 			});
+			if (object?.body) {
+				legacyFetchSuccess += 1;
+			} else {
+				legacyFetchMiss += 1;
+				if (sampleMisses.length < 12) {
+					sampleMisses.push({ id: image.uuid, category: image.category, attempted });
+				}
+			}
 		}
 		if (!object?.body) {
 			skipped += 1;
@@ -749,15 +808,39 @@ export async function migrateLegacyD1ToR2(platform: PlatformLike): Promise<{
 		migrated,
 		skipped,
 		categories: [...categories],
+		diagnostic: {
+			r2AlreadyPresent,
+			legacyFetchSuccess,
+			legacyFetchMiss,
+			sampleMisses,
+		},
 	};
 }
 
 export async function debugStorageSnapshot(platform: PlatformLike, category: string, sampleId?: string) {
+	const db = getD1Database(platform);
+	let legacyTable: LegacyTableInfo | null = null;
+	let legacyTotalCount: number | null = null;
+	if (db) {
+		legacyTable = await discoverLegacyTable(platform, db);
+		if (legacyTable) {
+			const tableName = quoteIdentifier(legacyTable.name);
+			const countRow = await runFirst<{ count: number | string }>(db, `SELECT COUNT(*) AS count FROM ${tableName}`);
+			const rawCount = countRow?.count;
+			if (typeof rawCount === "number") {
+				legacyTotalCount = Number.isFinite(rawCount) ? rawCount : null;
+			} else if (typeof rawCount === "string") {
+				const parsed = Number(rawCount);
+				legacyTotalCount = Number.isFinite(parsed) ? parsed : null;
+			}
+		}
+	}
+
 	const r2Page = await listR2ImagesPageByCategory(platform, category, 20);
 	const d1Items = await listLegacyImagesByCategory(platform, category);
 	const sample = sampleId ? await getImageById(platform, sampleId, category) : null;
 	const sampleSource = sampleId
-		? (await getR2Bucket(platform)?.get(buildObjectKey(category, sampleId, "original")))?.body
+		? (await getR2Bucket(platform)?.get(buildObjectKey(sampleId, "original")))?.body
 			? "r2"
 			: sample
 				? "d1-fallback"
@@ -766,6 +849,8 @@ export async function debugStorageSnapshot(platform: PlatformLike, category: str
 
 	return {
 		category,
+		legacyTable,
+		legacyTotalCount,
 		r2CountEstimate: r2Page.items.length,
 		d1Count: d1Items.length,
 		nextCursor: r2Page.nextCursor,
