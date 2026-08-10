@@ -1,6 +1,6 @@
 import { getImageById, getOrMigrateObject, getR2Bucket } from '$lib/cloudflare';
 
-const allowedVariants = new Set(['original', 'thumb', 'avatar', 'small', 'medium', 'large', 'public', 'private']);
+const allowedVariants = new Set(['original', 'square', 'thumb', 'avatar', 'small', 'medium', 'large', 'public', 'private']);
 const allowedFormats = new Set(['jpeg', 'jpg', 'png', 'webp', 'avif']);
 const allowedFits = new Set(['cover', 'contain', 'crop', 'pad', 'scale-down']);
 
@@ -65,6 +65,7 @@ function buildTransformOptions(variant: string, request: Request, searchParams: 
     }
 
     switch (variant) {
+        case 'square':
         case 'thumb':
         case 'avatar':
             options.width = options.width ?? 240;
@@ -189,12 +190,17 @@ export async function GET({ request, params: { id, variant }, platform }) {
 
     const legacyCategoryAlias = normalizedVariant === 'public' || normalizedVariant === 'private' ? normalizedVariant : null;
     const effectiveVariant = legacyCategoryAlias ? 'original' : normalizedVariant;
-    const image = await getImageById(platform, id, legacyCategoryAlias ?? undefined);
-    if (!image) {
-        return new Response('Not found', { status: 404 });
+    let imageCategory = legacyCategoryAlias;
+
+    if (!imageCategory) {
+        const image = await getImageById(platform, id);
+        if (!image) {
+            return new Response('Not found', { status: 404 });
+        }
+        imageCategory = image.category;
     }
 
-    if (image.category === 'private') {
+    if (imageCategory === 'private') {
         const referer = request.headers.get('referer');
         if (!referer) {
             return new Response('Forbidden', { status: 403 });
@@ -217,11 +223,11 @@ export async function GET({ request, params: { id, variant }, platform }) {
 
     const isInternalSource = request.headers.get('x-imagio-internal-source') === '1';
     const requestedKey = isInternalSource
-        ? `images/${image.category}/${id}/original`
-        : `images/${image.category}/${id}/${effectiveVariant}`;
+        ? `images/${imageCategory}/${id}/original`
+        : `images/${imageCategory}/${id}/${effectiveVariant}`;
     const candidates = [
         requestedKey,
-        !isInternalSource && effectiveVariant !== 'original' ? `images/${image.category}/${id}/original` : null,
+        !isInternalSource && effectiveVariant !== 'original' ? `images/${imageCategory}/${id}/original` : null,
     ].filter(Boolean) as string[];
 
     const transformOptions = buildTransformOptions(effectiveVariant, request, new URL(request.url).searchParams);
@@ -229,7 +235,7 @@ export async function GET({ request, params: { id, variant }, platform }) {
         const rendered = await getOrRenderVariant(
             platform,
             request,
-            image.category,
+            imageCategory,
             id,
             effectiveVariant,
             transformOptions,
@@ -239,7 +245,7 @@ export async function GET({ request, params: { id, variant }, platform }) {
             if (rendered.object.httpMetadata?.contentType) {
                 headers.set('content-type', rendered.object.httpMetadata.contentType);
             }
-            headers.set('cache-control', image.category === 'private' ? 'private, no-store' : 'public, max-age=31536000, immutable');
+            headers.set('cache-control', imageCategory === 'private' ? 'private, no-store' : 'public, max-age=31536000, immutable');
             headers.set('content-disposition', `inline; filename="${id}-${variant}"`);
             return new Response(rendered.object.body, { status: 200, headers });
         }
@@ -249,10 +255,10 @@ export async function GET({ request, params: { id, variant }, platform }) {
         const object = await getOrMigrateObject(platform, key, {
             migrateFromLegacy: key.endsWith('/original'),
             legacySourceKeys: [
-                `${id}/${image.category}`,
-                `${id}/${image.category}.jpg`,
-                `${id}/${image.category}.jpeg`,
-                `${id}/${image.category}.png`,
+                `${id}/${imageCategory}`,
+                `${id}/${imageCategory}.jpg`,
+                `${id}/${imageCategory}.jpeg`,
+                `${id}/${imageCategory}.png`,
                 legacyCategoryAlias ? `${id}/${legacyCategoryAlias}` : '',
                 legacyCategoryAlias ? `${id}/${legacyCategoryAlias}.jpg` : '',
             ].filter(Boolean),
@@ -262,7 +268,7 @@ export async function GET({ request, params: { id, variant }, platform }) {
             if (object.httpMetadata?.contentType) {
                 headers.set('content-type', object.httpMetadata.contentType);
             }
-            headers.set('cache-control', image.category === 'private' ? 'private, no-store' : 'public, max-age=31536000, immutable');
+            headers.set('cache-control', imageCategory === 'private' ? 'private, no-store' : 'public, max-age=31536000, immutable');
             headers.set('content-disposition', `inline; filename="${id}-${variant}"`);
             return new Response(object.body, { status: 200, headers });
         }
