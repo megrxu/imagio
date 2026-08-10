@@ -121,21 +121,6 @@
 		});
 	};
 
-	const preload = async (src: string) => {
-		try {
-			const resp = await fetch(src, { cache: "force-cache" });
-			if (!resp.ok) throw new Error("Failed to load image");
-			const blob = await resp.blob();
-			return await new Promise<string>((resolve) => {
-				const reader = new FileReader();
-				reader.readAsDataURL(blob);
-				reader.onload = () => resolve(reader.result?.toString() || "");
-				reader.onerror = () => resolve("");
-			});
-		} catch {
-			return "";
-		}
-	};
 </script>
 
 <h1 class="title-page my-6 text-center">{$_("page.images.title")}</h1>
@@ -180,26 +165,12 @@
 					};
 				}}
 			>
-				{#await preload(`/delivery/${remoteImage.uuid}/square`)}
-					<div
-						style="height: 216px"
-						class="flex items-center justify-center rounded panel-muted"
-					>
-						<Spinner size="6" color="gray" />
-					</div>
-				{:then base64}
-					{#if base64}
-						<img
-							src={base64}
-							class="cursor-pointer w-full h-56 object-cover rounded"
-							alt={remoteImage.uuid}
-						/>
-					{:else}
-						<div class="flex h-56 items-center justify-center rounded panel-muted text-sm text-muted">
-							无法预览
-						</div>
-					{/if}
-				{/await}
+				<img
+					src={`/delivery/${remoteImage.uuid}/square`}
+					loading="lazy"
+					class="cursor-pointer w-full h-56 object-cover rounded"
+					alt={remoteImage.uuid}
+				/>
 			</figure>
 			<div class="flex items-center gap-1">
 				<Checkbox
