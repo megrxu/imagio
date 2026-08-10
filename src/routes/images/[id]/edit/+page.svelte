@@ -2,31 +2,47 @@
 	import { _ } from "svelte-i18n";
 	import type { LayoutServerData } from "../$types";
 	import EditMeta from "../../../../component/widget/EditMeta.svelte";
-	import { Check } from "radix-icons-svelte";
 	import { Button } from "flowbite-svelte";
 	export let data: LayoutServerData;
 
 	$: ({ image } = data);
 
 	$: meta = {
-		tags: [],
+		tags: image?.meta?.tags ?? [],
 		category: image?.category ?? "public",
+		originalName: image?.name ?? "",
+		uploadedAt: image?.uploadedAt ?? "",
 	};
 
 	const onClick = async () => {
+		const payload = {
+			tags: meta.tags,
+			category: meta.category,
+			originalName: meta.originalName?.trim() || undefined,
+			uploadedAt: meta.uploadedAt?.trim() || undefined,
+		};
+
 		fetch("./edit", {
 			method: "PATCH",
-			body: JSON.stringify(meta),
+			body: JSON.stringify(payload),
 		}).then(async (response) => {
 			const text = await response.text();
-			let resp = JSON.parse(text);
+			const resp = JSON.parse(text);
+			if (resp) {
+				meta = {
+					tags: resp.meta?.tags ?? [],
+					category: resp.category ?? "public",
+					originalName: resp.name ?? "",
+					uploadedAt: resp.uploadedAt ?? "",
+				};
+			}
 		});
 	};
 </script>
 
 <h1 class="title-page text-center my-6">{$_("page.image.edit.title")}</h1>
 
-<EditMeta {meta} />
+<EditMeta {meta} showCustomFields={true} />
 
 <div class="action-bar justify-center">
 	<Button size="sm" pill on:click={onClick}>

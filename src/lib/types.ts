@@ -6,10 +6,15 @@ export interface Image {
 export interface RemoteImage {
     uuid: string,
     category: string,
-    meta?: ImageMetaData
+    meta?: ImageMetaData,
+    name?: string,
+    deliveryUrl?: string,
+    uploadedAt?: string
 }
 
 export interface ImageMetaData {
     tags: string[],
-    category?: string
+    category?: string,
+    originalName?: string,
+    uploadedAt?: string
 }

@@ -9,7 +9,15 @@
 	let mounted = false;
 
 	onMount(() => {
+		const media = window.matchMedia("(prefers-color-scheme: dark)");
+		const applyTheme = (isDark: boolean) => {
+			document.documentElement.classList.toggle("dark", isDark);
+		};
+		applyTheme(media.matches);
+		const onChange = (event: MediaQueryListEvent) => applyTheme(event.matches);
+		media.addEventListener("change", onChange);
 		mounted = true;
+		return () => media.removeEventListener("change", onChange);
 	});
 </script>
 

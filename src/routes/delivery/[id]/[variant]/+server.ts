@@ -1,9 +1,27 @@
 import { getImageById, getOrMigrateObject, getR2Bucket } from '$lib/cloudflare';
 
+const allowedVariants = new Set(['original', 'thumb', 'avatar', 'small', 'medium', 'large', 'public', 'private']);
+const allowedFormats = new Set(['jpeg', 'jpg', 'png', 'webp', 'avif']);
+const allowedFits = new Set(['cover', 'contain', 'crop', 'pad', 'scale-down']);
+
+function clampInt(value: string | null, min: number, max: number): number | null {
+    if (!value) return null;
+    const n = Number.parseInt(value, 10);
+    if (!Number.isFinite(n)) return null;
+    return Math.min(max, Math.max(min, n));
+}
+
+function normalizeVariant(rawVariant: string) {
+    return allowedVariants.has(rawVariant) ? rawVariant : null;
+}
+
 function resolveOutputFormat(request: Request, searchParams: URLSearchParams) {
     const explicit = searchParams.get('format')?.trim().toLowerCase();
     if (explicit && explicit !== 'auto') {
-        return explicit === 'jpg' ? 'jpeg' : explicit;
+        const normalized = explicit === 'jpg' ? 'jpeg' : explicit;
+        if (allowedFormats.has(normalized)) {
+            return normalized;
+        }
     }
 
     const accept = request.headers.get('accept')?.toLowerCase() ?? '';
@@ -26,23 +44,23 @@ function buildTransformOptions(variant: string, request: Request, searchParams: 
         format,
     };
 
-    const width = searchParams.get('width');
-    if (width) {
-        options.width = Number(width);
+    const width = clampInt(searchParams.get('width'), 16, 4096);
+    if (width !== null) {
+        options.width = width;
     }
 
-    const height = searchParams.get('height');
-    if (height) {
-        options.height = Number(height);
+    const height = clampInt(searchParams.get('height'), 16, 4096);
+    if (height !== null) {
+        options.height = height;
     }
 
-    const quality = searchParams.get('quality');
-    if (quality) {
+    const quality = clampInt(searchParams.get('quality'), 1, 100);
+    if (quality !== null) {
         options.quality = quality;
     }
 
     const fit = searchParams.get('fit');
-    if (fit) {
+    if (fit && allowedFits.has(fit)) {
         options.fit = fit;
     }
 
@@ -164,7 +182,14 @@ async function getOrRenderVariant(
 }
 
 export async function GET({ request, params: { id, variant }, platform }) {
-    const image = await getImageById(platform, id);
+    const normalizedVariant = normalizeVariant(variant);
+    if (!normalizedVariant) {
+        return new Response('Unsupported variant', { status: 400 });
+    }
+
+    const legacyCategoryAlias = normalizedVariant === 'public' || normalizedVariant === 'private' ? normalizedVariant : null;
+    const effectiveVariant = legacyCategoryAlias ? 'original' : normalizedVariant;
+    const image = await getImageById(platform, id, legacyCategoryAlias ?? undefined);
     if (!image) {
         return new Response('Not found', { status: 404 });
     }
@@ -193,20 +218,20 @@ export async function GET({ request, params: { id, variant }, platform }) {
     const isInternalSource = request.headers.get('x-imagio-internal-source') === '1';
     const requestedKey = isInternalSource
         ? `images/${image.category}/${id}/original`
-        : `images/${image.category}/${id}/${variant}`;
+        : `images/${image.category}/${id}/${effectiveVariant}`;
     const candidates = [
         requestedKey,
-        !isInternalSource && variant !== 'original' ? `images/${image.category}/${id}/original` : null,
+        !isInternalSource && effectiveVariant !== 'original' ? `images/${image.category}/${id}/original` : null,
     ].filter(Boolean) as string[];
 
-    const transformOptions = buildTransformOptions(variant, request, new URL(request.url).searchParams);
+    const transformOptions = buildTransformOptions(effectiveVariant, request, new URL(request.url).searchParams);
     if (transformOptions && !isInternalSource) {
         const rendered = await getOrRenderVariant(
             platform,
             request,
             image.category,
             id,
-            variant,
+            effectiveVariant,
             transformOptions,
         );
         if (rendered?.object.body) {
@@ -214,7 +239,7 @@ export async function GET({ request, params: { id, variant }, platform }) {
             if (rendered.object.httpMetadata?.contentType) {
                 headers.set('content-type', rendered.object.httpMetadata.contentType);
             }
-            headers.set('cache-control', 'public, max-age=31536000, immutable');
+            headers.set('cache-control', image.category === 'private' ? 'private, no-store' : 'public, max-age=31536000, immutable');
             headers.set('content-disposition', `inline; filename="${id}-${variant}"`);
             return new Response(rendered.object.body, { status: 200, headers });
         }
@@ -223,13 +248,21 @@ export async function GET({ request, params: { id, variant }, platform }) {
     for (const key of candidates) {
         const object = await getOrMigrateObject(platform, key, {
             migrateFromLegacy: key.endsWith('/original'),
+            legacySourceKeys: [
+                `${id}/${image.category}`,
+                `${id}/${image.category}.jpg`,
+                `${id}/${image.category}.jpeg`,
+                `${id}/${image.category}.png`,
+                legacyCategoryAlias ? `${id}/${legacyCategoryAlias}` : '',
+                legacyCategoryAlias ? `${id}/${legacyCategoryAlias}.jpg` : '',
+            ].filter(Boolean),
         });
         if (object?.body) {
             const headers = new Headers();
             if (object.httpMetadata?.contentType) {
                 headers.set('content-type', object.httpMetadata.contentType);
             }
-            headers.set('cache-control', 'public, max-age=31536000, immutable');
+            headers.set('cache-control', image.category === 'private' ? 'private, no-store' : 'public, max-age=31536000, immutable');
             headers.set('content-disposition', `inline; filename="${id}-${variant}"`);
             return new Response(object.body, { status: 200, headers });
         }

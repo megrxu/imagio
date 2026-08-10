@@ -1,18 +1,18 @@
 <script lang="ts">
     import { Button } from "flowbite-svelte";
-    export let path: string;
-    export let page: number;
+    export let prevHref: string | null = null;
+    export let nextHref: string | null = null;
 </script>
 
 <div class="flex my-2 justify-center gap-2">
     <Button
         tag="a"
-        href={`${path}?page=${Math.max(page - 1, 1)}`}
+        href={prevHref ?? '#'}
         rel="prev"
         aria-label="上一页"
         size="xs"
         color="alternative"
-        disabled={page <= 1}
+        disabled={!prevHref}
     >
         <svg
             class="w-3.5 h-3.5 mr-2"
@@ -33,11 +33,12 @@
     </Button>
     <Button
         tag="a"
-        href={`${path}?page=${page + 1}`}
+        href={nextHref ?? '#'}
         rel="next"
         aria-label="下一页"
         size="xs"
         color="alternative"
+        disabled={!nextHref}
     >
         下一页
         <svg

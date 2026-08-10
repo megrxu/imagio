@@ -21,19 +21,32 @@
 
 	// 顯式本地狀態：避免透過 reactive 解構造成 Svelte 無法追蹤重新指派
 	let remoteImages: RemoteImage[] = [...data.remoteImages];
-	let page = data.page;
 	let category = data.category;
 	let path = data.path;
+	let cursor = data.cursor;
+	let nextCursor = data.nextCursor;
+	let prevHref = data.prevHref;
+	let nextHref = data.nextHref;
+	let source = data.source;
+	let limit = data.limit;
 
 	// 如果進行了路由參數切換（例如分頁或分類導航），同步重置本地狀態
 	$: if (
-		data.page !== page ||
 		data.category !== category ||
-		data.path !== path
+		data.path !== path ||
+		data.cursor !== cursor ||
+		data.nextCursor !== nextCursor ||
+		data.prevHref !== prevHref ||
+		data.nextHref !== nextHref
 	) {
-		page = data.page;
 		category = data.category;
 		path = data.path;
+		cursor = data.cursor;
+		nextCursor = data.nextCursor;
+		prevHref = data.prevHref;
+		nextHref = data.nextHref;
+		source = data.source;
+		limit = data.limit;
 		remoteImages = [...data.remoteImages];
 		checked_ids = {};
 	}
@@ -42,8 +55,6 @@
 		category: category,
 		tags: [],
 	};
-
-	let appendImages: RemoteImage[];
 
 	let confirmOpen = false;
 	let confirmBatch = false;
@@ -67,7 +78,6 @@
 		deleting = true;
 		try {
 			if (confirmBatch) {
-				let count = 0;
 				const toDelete = remoteImages.filter(
 					(r) => checked_ids[r.uuid],
 				);
@@ -81,11 +91,7 @@
 				for (const id of Object.keys(checked_ids)) {
 					if (checked_ids[id]) delete checked_ids[id];
 				}
-				count = toDelete.length;
-				// 避免瞬間 fetch race，稍微延遲後補足
-				setTimeout(() => {
-					fetchMore(count);
-				}, 150);
+				const count = toDelete.length;
 				notify.success(
 					`${count} ${$_("general.notification.delete_ok")}`,
 				);
@@ -94,9 +100,6 @@
 				await fetch(`/images/${delId}`, { method: "DELETE" });
 				remoteImages = remoteImages.filter((i) => i.uuid !== delId);
 				if (checked_ids[delId]) delete checked_ids[delId];
-				setTimeout(() => {
-					fetchMore(1);
-				}, 120);
 				notify.success($_("general.notification.delete_ok"));
 			}
 		} catch (e) {
@@ -109,24 +112,6 @@
 		}
 	}
 
-	const fetchMore = async (more: number) => {
-		if (more <= 0) return;
-		const skip = page * 24 - more;
-		appendImages = await (
-			await fetch(
-				`/delivery?category=${category}&limit=${more}&skip=${skip < 0 ? 0 : skip}`,
-			)
-		).json();
-		// 去重，保持舊順序在前
-		const existing = new Set(remoteImages.map((i) => i.uuid));
-		for (const img of appendImages) {
-			if (!existing.has(img.uuid)) {
-				remoteImages = [...remoteImages, img]; // 重新指派觸發更新
-				existing.add(img.uuid);
-			}
-		}
-	};
-
 	const doEdit = async (imageUUID: string) => {
 		fetch(`./${category}/${imageUUID}/edit`, {
 			method: "PATCH",
@@ -135,8 +120,6 @@
 			console.log(response);
 		});
 	};
-
-	const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 	const preload = async (src: string) => {
 		try {
@@ -176,7 +159,8 @@
 		>{$_("page.images.batch_delete")}</Button
 	>
 </div>
-<Pagination {path} {page} />
+<Pagination {prevHref} {nextHref} />
+<div class="text-center text-xs text-muted mb-2">source: {source}</div>
 {#if remoteImages.length === 0}
 	<Alert color="gray" class="my-2 w-full text-center"
 		>{$_("page.images.no_images")}</Alert
@@ -267,10 +251,17 @@
 					><Cross2 class="text-red-600" /></Button
 				>
 			</div>
+			<div class="mt-2 text-xs text-muted space-y-1">
+				<div class="truncate">{remoteImage.name ?? remoteImage.uuid}</div>
+				<div>{remoteImage.uploadedAt ? new Date(remoteImage.uploadedAt).toLocaleString() : ""}</div>
+				{#if remoteImage.meta?.tags?.length}
+					<div class="truncate">#{remoteImage.meta.tags.join(" #")}</div>
+				{/if}
+			</div>
 		</div>
 	{/each}
 </div>
-<Pagination {path} {page} />
+<Pagination {prevHref} {nextHref} />
 
 <!-- Delete Confirmation Modal -->
 <Modal size="md" open={confirmOpen} on:close={() => (confirmOpen = false)}>
