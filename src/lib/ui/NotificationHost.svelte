@@ -36,8 +36,3 @@
     {/each}
 </div>
 
-<style>
-    :global(body) {
-        /* ensure space for pointer events layering if needed */
-    }
-</style>

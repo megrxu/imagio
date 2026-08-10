@@ -1,20 +1,12 @@
 import type { ImageMetaData } from "$lib/types";
+import { updateImageMetadata } from "$lib/cloudflare";
 
-export async function PATCH({ fetch, request, params: { id }, platform }) {
-    let { SERVER_URL, ACCOUNT_ID, TOKEN } = platform?.env ?? {};
-    const ENDPOINT = `${SERVER_URL}/${ACCOUNT_ID}/image/${id}`
-    let meta: ImageMetaData = JSON.parse(await request.text())
-    const req = {
-        method: 'PATCH',
+export async function PATCH({ request, params: { id }, platform }) {
+    const meta: ImageMetaData = JSON.parse(await request.text());
+    const updated = await updateImageMetadata(platform, id, meta);
+    return new Response(JSON.stringify(updated), {
         headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${TOKEN}`
+            'content-type': 'application/json; charset=utf-8',
         },
-        body: JSON.stringify(
-            {
-                'metadata': meta
-            }
-        )
-    };
-    return fetch(ENDPOINT, req)
+    });
 }

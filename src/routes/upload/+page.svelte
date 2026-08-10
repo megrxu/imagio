@@ -1,64 +1,95 @@
 <script lang="ts">
-	import type { Image, RemoteImage } from "$lib/types";
+	import type { Image } from "$lib/types";
 	import SubmitProgress from "../../component/widget/SubmitProgress.svelte";
 	import { _ } from "svelte-i18n";
-	import { redirect } from "@sveltejs/kit";
-	import { Alert, Label, Select, Button, Card } from "flowbite-svelte";
+	import { goto } from "$app/navigation";
+	import { Alert, Label, Select, Button, Spinner } from "flowbite-svelte";
+	import { notify } from "$lib/ui/notifications";
 
-	let files: FileList;
+	let files: FileList | undefined;
 	let category: string = "public";
-	let placeholder: Boolean = true;
-	let uploading: Boolean = false;
+	let placeholder: boolean = true;
+	let uploading = false;
 	let uploaded = 0;
 	let alert: string | null = null;
 	let images: Image[] = [];
+	let isDragging = false;
+	let uploadError: string | null = null;
+	let selectedCount = 0;
+
+	function resetPreview() {
+		images = [];
+		placeholder = true;
+		selectedCount = 0;
+		uploaded = 0;
+		alert = null;
+		uploadError = null;
+	}
 
 	function onChange() {
-		if (files) {
+		if (files && files.length > 0) {
 			placeholder = false;
 			uploaded = 0;
-			for (const file of files) {
+			images = [];
+			selectedCount = files.length;
+			for (const file of Array.from(files)) {
 				const reader = new FileReader();
 				reader.addEventListener("load", function () {
 					const image: Image = {
 						src: reader.result,
-						file: file,
+						file,
 					};
 					images = [...images, image];
 				});
 				reader.readAsDataURL(file);
 			}
+		} else {
+			resetPreview();
+		}
+	}
+
+	function onDrop(event: DragEvent) {
+		event.preventDefault();
+		isDragging = false;
+		if (event.dataTransfer?.files?.length) {
+			files = event.dataTransfer.files;
+			onChange();
 		}
 	}
 
 	async function doUpload() {
-		if (images) {
-			uploading = true;
-			let uploaded_cnt = 0;
+		if (!files || files.length === 0) {
+			uploadError = $_("page.upload.images_upload_failed", {
+				values: { name: "" },
+			});
+			return;
+		}
+
+		uploading = true;
+		alert = null;
+		uploadError = null;
+		let uploadedCnt = 0;
+		try {
 			for (const image of images) {
 				const formData = new FormData();
 				formData.append("file", image.file);
-				let resp: Response = await fetch(`/upload/${category}`, {
+				const resp = await fetch(`/upload/${category}`, {
 					method: "PUT",
 					body: formData,
 				});
-				// let remoteImage: RemoteImage = await resp.json();
-				// if (remoteImage.uuid) {
-				uploaded_cnt += 1;
-				uploaded = Math.floor((uploaded_cnt / files.length) * 100);
-				// }
-				//  else {
-				// 	alert = $_("page.upload.images_upload_failed", {
-				// 		values: { name: image.file.name },
-				// 	});
-				// 	uploading = false;
-				// 	return;
-				// }
+				if (!resp.ok) {
+					throw new Error((await resp.text()) || image.file.name);
+				}
+				uploadedCnt += 1;
+				uploaded = Math.floor((uploadedCnt / files.length) * 100);
 			}
+			notify.success(`已成功上传 ${uploadedCnt} 张图片`);
+			await goto(`/images?category=${category}`);
+		} catch (error) {
+			uploadError = error instanceof Error ? error.message : String(error);
+			notify.error("上传失败，请检查图片格式或 Cloudflare 配置。" );
+		} finally {
 			uploading = false;
-			images = [];
-			redirect(301, `/images/${category}`);
-		}
 	}
 </script>
 
@@ -68,21 +99,24 @@
 {/if}
 <div class="mb-4 card">
 	<div class="card-body">
-	<Label for="upload-category" class="mb-2">{$_("term.category")}</Label>
-	<Select id="upload-category" bind:value={category} class="w-full">
-		<option value="public">public</option>
-		<option value="private">private</option>
-	</Select>
+		<Label for="upload-category" class="mb-2">{$_("term.category")}</Label>
+		<Select id="upload-category" bind:value={category} class="w-full">
+			<option value="public">public</option>
+			<option value="private">private</option>
+		</Select>
 	</div>
 </div>
 <div class="action-bar justify-center">
 	<label for="uploads" class="cursor-pointer">
 		<Button size="sm" pill>{$_("page.upload.select")}</Button>
 	</label>
-	<a href={`/images`}>
+	<a href={`/images?category=${category}`}>
 		<Button size="sm" pill color="light">{$_("term.gallery")}</Button>
 	</a>
-	<Button size="sm" pill color="green" on:click={doUpload}>
+	<Button size="sm" pill color="green" on:click={doUpload} disabled={uploading}>
+		{#if uploading}
+			<Spinner size="4" class="mr-2" />
+		{/if}
 		{$_("page.upload.upload")}
 	</Button>
 	<input
@@ -92,22 +126,37 @@
 		bind:files
 		on:change={onChange}
 		id="uploads"
-		accept="*"
+		accept="image/*"
 	/>
-	>
 </div>
-<div class="card">
+{#if alert}
+	<Alert color="red" class="mb-4">{alert}</Alert>
+{/if}
+{#if uploadError}
+	<Alert color="red" class="mb-4">{uploadError}</Alert>
+{/if}
+<div
+	class={`card transition ${isDragging ? "ring-2 ring-blue-500" : ""}`}
+	on:dragover|preventDefault={() => (isDragging = true)}
+	on:dragleave|preventDefault={() => (isDragging = false)}
+	on:drop|preventDefault={onDrop}
+>
 	<div class="card-body">
 		{#if placeholder}
-			<label for="uploads" class="block w-full cursor-pointer h-96 flex items-center justify-center text-muted">
-				{$_("page.upload.images_placeholder")}
+			<label for="uploads" class="block w-full cursor-pointer h-96 flex flex-col items-center justify-center text-muted gap-2">
+				<span class="text-lg font-medium">拖拽图片到这里，或点击选择</span>
+				<span class="text-sm text-gray-500">支持 JPG、PNG、WebP 和 GIF</span>
 			</label>
 		{:else}
+			<div class="flex items-center justify-between mb-3 text-sm text-gray-600">
+				<span>已选择 {selectedCount} 张图片</span>
+				<Button size="xs" color="light" on:click={resetPreview}>清空</Button>
+			</div>
 			<div class="grid grid-cols-2 md:grid-cols-4 gap-4 h-96 w-full overflow-y-auto">
 				{#each images as image}
 					<div>
 						<figure>
-							<img src={String(image.src)} alt="" class="rounded-md" />
+							<img src={String(image.src)} alt="" class="rounded-md object-cover h-32 w-full" />
 						</figure>
 					</div>
 				{/each}

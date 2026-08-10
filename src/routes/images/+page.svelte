@@ -11,7 +11,6 @@
 	import EditMeta from "../../component/widget/EditMeta.svelte";
 	import Pagination from "../../component/widget/Pagination.svelte";
 	import type { RemoteImage } from "$lib/types";
-	import { onMount } from "svelte";
 	import { Button, Checkbox, Spinner, Alert } from "flowbite-svelte";
 	import { Modal } from "flowbite-svelte";
 	import { notify } from "$lib/ui/notifications";
@@ -140,15 +139,19 @@
 	const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 	const preload = async (src: string) => {
-		const resp = await fetch(src);
-		const blob = await resp.blob();
-
-		const res: Promise<string> = new Promise(function (resolve) {
-			let reader = new FileReader();
-			reader.readAsDataURL(blob);
-			reader.onload = () => resolve(reader.result?.toString() || "");
-		});
-		return res;
+		try {
+			const resp = await fetch(src, { cache: "force-cache" });
+			if (!resp.ok) throw new Error("Failed to load image");
+			const blob = await resp.blob();
+			return await new Promise<string>((resolve) => {
+				const reader = new FileReader();
+				reader.readAsDataURL(blob);
+				reader.onload = () => resolve(reader.result?.toString() || "");
+				reader.onerror = () => resolve("");
+			});
+		} catch {
+			return "";
+		}
 	};
 </script>
 
@@ -203,11 +206,17 @@
 						<Spinner size="6" color="gray" />
 					</div>
 				{:then base64}
-					<img
-						src={base64}
-						class="cursor-pointer w-full"
-						alt={remoteImage.uuid}
-					/>
+					{#if base64}
+						<img
+							src={base64}
+							class="cursor-pointer w-full h-56 object-cover rounded"
+							alt={remoteImage.uuid}
+						/>
+					{:else}
+						<div class="flex h-56 items-center justify-center rounded bg-gray-100 text-sm text-gray-500">
+							无法预览
+						</div>
+					{/if}
 				{/await}
 			</figure>
 			<div class="flex items-center gap-1">

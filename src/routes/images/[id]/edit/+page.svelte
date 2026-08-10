@@ -10,7 +10,7 @@
 
 	$: meta = {
 		tags: [],
-		category: image.category,
+		category: image?.category ?? "public",
 	};
 
 	const onClick = async () => {
