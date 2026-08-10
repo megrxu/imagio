@@ -28,7 +28,7 @@
 			</div>
 			<Footer class="my-4">
 				<div
-					class="flex items-center justify-center py-4 text-sm text-gray-600 dark:text-gray-400 w-full"
+					class="flex items-center justify-center py-4 text-sm text-muted w-full"
 				>
 					<strong class="mr-1">Imagio</strong> | Build with ♥️ at
 					<a

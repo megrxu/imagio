@@ -7,7 +7,7 @@
 
   /* Card shell */
   .card {
-    @apply bg-[rgb(var(--surface))] text-[rgb(var(--surface-foreground))] rounded-sm shadow-sm border border-[rgb(var(--border))];
+    @apply bg-[rgb(var(--surface))] text-[rgb(var(--surface-foreground))] rounded-[var(--radius-lg)] shadow-sm border border-[rgb(var(--border))] backdrop-blur;
   }
   .card-body {
     @apply p-4 sm:p-6;
@@ -15,7 +15,7 @@
 
   /* Titles */
   .title-page {
-    @apply text-2xl font-semibold tracking-tight text-[rgb(var(--surface-foreground))];
+    @apply text-2xl font-semibold tracking-tight text-[rgb(var(--surface-foreground))] md:text-3xl;
   }
   .title-section {
     @apply text-lg font-medium text-[rgb(var(--surface-foreground))];
@@ -26,7 +26,7 @@
 
   /* Inputs: rely on Flowbite structure, just unify ring and radius */
   .input {
-    @apply rounded-md ring-1 ring-inset ring-[rgb(var(--border))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ring))] bg-[rgb(var(--surface))] text-[rgb(var(--surface-foreground))];
+    @apply rounded-[var(--radius-md)] ring-1 ring-inset ring-[rgb(var(--border))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ring))] bg-[rgb(var(--surface))] text-[rgb(var(--surface-foreground))];
   }
 
   /* Buttons: complement Flowbite variants */
@@ -43,4 +43,8 @@
 
   /* Horizontal action bar for groups of buttons/filters */
   .action-bar { @apply flex flex-wrap items-center gap-3 my-4; }
+
+  .panel-muted {
+    @apply rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))]/70;
+  }
 }

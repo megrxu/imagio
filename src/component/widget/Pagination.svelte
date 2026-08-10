@@ -11,7 +11,7 @@
         rel="prev"
         aria-label="上一页"
         size="xs"
-        color="light"
+        color="alternative"
         disabled={page <= 1}
     >
         <svg
@@ -37,7 +37,7 @@
         rel="next"
         aria-label="下一页"
         size="xs"
-        color="light"
+        color="alternative"
     >
         下一页
         <svg

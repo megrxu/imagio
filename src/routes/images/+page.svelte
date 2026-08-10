@@ -158,14 +158,12 @@
 <h1 class="title-page my-6 text-center">{$_("page.images.title")}</h1>
 
 <EditMeta bind:meta />
+
 <div class="m-auto my-8 flex items-center justify-center gap-4">
-	<a href="/upload"
-		><Button size="sm" color="blue">{$_("page.upload.upload")}</Button
-		></a
-	>
+	<Button tag="a" href="/upload" size="sm" color="alternative">{$_("page.upload.upload")}</Button>
 	<Button
 		size="sm"
-		color="dark"
+		color="alternative"
 		on:click={() => {
 			remoteImages.forEach(async (remote_image) => {
 				if (checked_ids[remote_image.uuid]) {
@@ -201,7 +199,7 @@
 				{#await preload(`/delivery/${remoteImage.uuid}/square`)}
 					<div
 						style="height: 216px"
-						class="flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded"
+						class="flex items-center justify-center rounded panel-muted"
 					>
 						<Spinner size="6" color="gray" />
 					</div>
@@ -213,7 +211,7 @@
 							alt={remoteImage.uuid}
 						/>
 					{:else}
-						<div class="flex h-56 items-center justify-center rounded bg-gray-100 text-sm text-gray-500">
+						<div class="flex h-56 items-center justify-center rounded panel-muted text-sm text-muted">
 							无法预览
 						</div>
 					{/if}
@@ -231,7 +229,7 @@
 					title={$_("page.images.action.copy_id")}
 					on:click={() =>
 						navigator.clipboard.writeText(remoteImage.uuid)}
-					><Copy class="text-gray-600" /></Button
+					><Copy class="text-muted" /></Button
 				>
 				<Button
 					tag="a"
@@ -240,7 +238,7 @@
 					size="xs"
 					class="p-1 hover:bg-transparent focus:ring-0"
 					title={$_("page.images.action.blob")}
-					><MagnifyingGlass class="text-gray-600" /></Button
+					><MagnifyingGlass class="text-muted" /></Button
 				>
 				<Button
 					tag="a"
@@ -249,7 +247,7 @@
 					size="xs"
 					class="p-1 hover:bg-transparent focus:ring-0"
 					title={$_("page.images.action.view")}
-					><InfoCircled class="text-gray-600" /></Button
+					><InfoCircled class="text-muted" /></Button
 				>
 				<Button
 					tag="a"
@@ -258,7 +256,7 @@
 					size="xs"
 					class="p-1 hover:bg-transparent focus:ring-0"
 					title={$_("page.images.action.edit")}
-					><Pencil2 class="text-gray-500" /></Button
+					><Pencil2 class="text-muted" /></Button
 				>
 				<Button
 					color="none"
@@ -291,7 +289,7 @@
 		{/if}
 	</div>
 	<div slot="footer" class="flex justify-end gap-3">
-		<Button color="light" size="xs" on:click={() => (confirmOpen = false)}
+		<Button color="alternative" size="xs" on:click={() => (confirmOpen = false)}
 			>{$_("general.notification.cancel")}</Button
 		>
 		<Button

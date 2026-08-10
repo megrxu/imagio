@@ -87,9 +87,10 @@
 			await goto(`/images?category=${category}`);
 		} catch (error) {
 			uploadError = error instanceof Error ? error.message : String(error);
-			notify.error("上传失败，请检查图片格式或 Cloudflare 配置。" );
+			notify.error("上传失败，请检查图片格式或 Cloudflare 配置。");
 		} finally {
 			uploading = false;
+		}
 	}
 </script>
 
@@ -108,11 +109,11 @@
 </div>
 <div class="action-bar justify-center">
 	<label for="uploads" class="cursor-pointer">
-		<Button size="sm" pill>{$_("page.upload.select")}</Button>
+		<Button size="sm" pill color="alternative">{$_("page.upload.select")}</Button>
 	</label>
-	<a href={`/images?category=${category}`}>
-		<Button size="sm" pill color="light">{$_("term.gallery")}</Button>
-	</a>
+	<Button tag="a" href={`/images?category=${category}`} size="sm" pill color="alternative">
+		{$_("term.gallery")}
+	</Button>
 	<Button size="sm" pill color="green" on:click={doUpload} disabled={uploading}>
 		{#if uploading}
 			<Spinner size="4" class="mr-2" />
@@ -129,28 +130,27 @@
 		accept="image/*"
 	/>
 </div>
-{#if alert}
-	<Alert color="red" class="mb-4">{alert}</Alert>
-{/if}
 {#if uploadError}
 	<Alert color="red" class="mb-4">{uploadError}</Alert>
 {/if}
 <div
 	class={`card transition ${isDragging ? "ring-2 ring-blue-500" : ""}`}
+	role="region"
+	aria-label="图片上传拖拽区域"
 	on:dragover|preventDefault={() => (isDragging = true)}
 	on:dragleave|preventDefault={() => (isDragging = false)}
 	on:drop|preventDefault={onDrop}
 >
 	<div class="card-body">
 		{#if placeholder}
-			<label for="uploads" class="block w-full cursor-pointer h-96 flex flex-col items-center justify-center text-muted gap-2">
+			<label for="uploads" class="block w-full cursor-pointer h-96 flex flex-col items-center justify-center text-muted gap-2 panel-muted">
 				<span class="text-lg font-medium">拖拽图片到这里，或点击选择</span>
-				<span class="text-sm text-gray-500">支持 JPG、PNG、WebP 和 GIF</span>
+				<span class="text-sm text-muted">支持 JPG、PNG、WebP 和 GIF</span>
 			</label>
 		{:else}
-			<div class="flex items-center justify-between mb-3 text-sm text-gray-600">
+			<div class="flex items-center justify-between mb-3 text-sm text-muted">
 				<span>已选择 {selectedCount} 张图片</span>
-				<Button size="xs" color="light" on:click={resetPreview}>清空</Button>
+				<Button size="xs" color="alternative" on:click={resetPreview}>清空</Button>
 			</div>
 			<div class="grid grid-cols-2 md:grid-cols-4 gap-4 h-96 w-full overflow-y-auto">
 				{#each images as image}
