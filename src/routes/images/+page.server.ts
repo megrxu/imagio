@@ -1,9 +1,9 @@
 import type { RemoteImage } from '$lib/types';
 import type { PageServerLoad } from './$types';
-import { buildSignedDeliveryUrl, listImagesByCategorySorted, type ImageSortMode } from '$lib/cloudflare';
+import { buildSignedDeliveryUrl, listImagesByCategoryPagedSorted, type ImageSortMode } from '$lib/cloudflare';
 
 function normalizeSortMode(raw: string | null): ImageSortMode {
-    return raw === 'taken' ? 'taken' : 'uploaded';
+    return raw === 'uploaded' ? 'uploaded' : 'taken';
 }
 
 export const load: PageServerLoad = async ({ url, platform }) => {
@@ -13,14 +13,16 @@ export const load: PageServerLoad = async ({ url, platform }) => {
     const page = Number.isFinite(pageRaw) ? Math.max(1, pageRaw) : 1;
     const limit = Math.max(1, Math.min(48, parseInt(url.searchParams.get('limit') ?? '24', 10)));
 
-    const result = await listImagesByCategorySorted(platform, category, sort);
-    const allImages = result.items;
-    const totalItems = allImages.length;
+    const result = await listImagesByCategoryPagedSorted(platform, category, sort, page, limit);
+    const totalItems = result.totalItems;
     const totalPages = Math.max(1, Math.ceil(totalItems / limit));
     const currentPage = Math.min(page, totalPages);
-    const offset = (currentPage - 1) * limit;
+    const needReloadWithAdjustedPage = currentPage !== page && totalItems > 0;
+    const adjustedResult = needReloadWithAdjustedPage
+        ? await listImagesByCategoryPagedSorted(platform, category, sort, currentPage, limit)
+        : result;
     const remoteImages: RemoteImage[] = await Promise.all(
-        allImages.slice(offset, offset + limit).map(async (image) => ({
+        adjustedResult.items.map(async (image) => ({
             ...image,
             deliveryUrl: await buildSignedDeliveryUrl(image.uuid, 'original', platform),
         })),
@@ -39,7 +41,7 @@ export const load: PageServerLoad = async ({ url, platform }) => {
         remoteImages,
         prevHref,
         nextHref,
-        source: result.source,
+        source: adjustedResult.source,
         limit,
         category,
         currentPage,

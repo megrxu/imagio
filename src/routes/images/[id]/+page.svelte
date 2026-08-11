@@ -14,7 +14,7 @@
 		if (Number.isNaN(date.getTime())) {
 			return value;
 		}
-		return date.toLocaleString("zh-CN");
+		return date.toLocaleString();
 	}
 </script>
 

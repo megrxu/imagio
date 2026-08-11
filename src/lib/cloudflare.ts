@@ -67,10 +67,49 @@ type LegacyTableInfo = {
 export type ImageListPage = {
 	items: RemoteImage[];
 	nextCursor: string | null;
-	source: "r2" | "d1-fallback" | "empty";
+	source: "r2" | "d1-fallback" | "d1-index" | "empty";
 };
 
 export type ImageSortMode = "uploaded" | "taken";
+
+type D1ImageIndexRow = {
+	id: string;
+	object_key: string;
+	uploaded_at_ms: number | string;
+	taken_at_ms: number | string | null;
+	created_at_ms: number | string | null;
+	meta_json: string;
+	updated_at_ms: number | string;
+};
+
+const d1ImageIndexTableName = "imagio_images";
+
+const d1ImageIndexSchemaSql = [
+	`CREATE TABLE IF NOT EXISTS ${d1ImageIndexTableName} (
+		id TEXT PRIMARY KEY,
+		object_key TEXT NOT NULL UNIQUE,
+		uploaded_at_ms INTEGER NOT NULL,
+		taken_at_ms INTEGER,
+		created_at_ms INTEGER,
+		meta_json TEXT NOT NULL CHECK (json_valid(meta_json)),
+		updated_at_ms INTEGER NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_imagio_images_category_uploaded
+		ON ${d1ImageIndexTableName} (
+			json_extract(meta_json, '$.category'),
+			uploaded_at_ms DESC,
+			id DESC
+		)`,
+	`CREATE INDEX IF NOT EXISTS idx_imagio_images_category_taken
+		ON ${d1ImageIndexTableName} (
+			json_extract(meta_json, '$.category'),
+			(taken_at_ms IS NULL),
+			taken_at_ms DESC,
+			COALESCE(created_at_ms, uploaded_at_ms) DESC,
+			uploaded_at_ms DESC,
+			id DESC
+		)`,
+];
 
 const fixedLegacyTable: LegacyTableInfo = { name: "images", idColumn: "uuid" };
 const defaultCategoryCandidates = ["public", "private"];
@@ -748,6 +787,180 @@ async function runFirst<T = Record<string, unknown>>(
 	return await bound.first<T>();
 }
 
+let d1ImageSchemaReady = false;
+
+async function ensureD1ImageIndexSchema(db: D1DatabaseLike): Promise<void> {
+	if (d1ImageSchemaReady) {
+		return;
+	}
+
+	for (const sql of d1ImageIndexSchemaSql) {
+		await runAll(db, sql);
+	}
+
+	d1ImageSchemaReady = true;
+}
+
+function toEpochMs(value?: string): number | null {
+	if (!value || typeof value !== "string") {
+		return null;
+	}
+	const parsed = parseSortableTimestamp(value);
+	return Number.isFinite(parsed) && parsed !== Number.NEGATIVE_INFINITY ? parsed : null;
+}
+
+function parseD1Number(value: number | string | null | undefined): number | null {
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return value;
+	}
+	if (typeof value === "string") {
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : null;
+	}
+	return null;
+}
+
+function toIsoFromEpoch(value: number | null): string | undefined {
+	if (!Number.isFinite(value) || value === null) {
+		return undefined;
+	}
+	return new Date(value).toISOString();
+}
+
+function buildIndexMetadata(image: RemoteImage): ImageMetaData {
+	return buildImageMetadata(image.category, image.meta, {
+		originalName: image.name ?? image.uuid,
+		uploadedAt: image.meta?.uploadedAt ?? image.uploadedAt,
+	});
+}
+
+async function upsertImageToD1Index(platform: PlatformLike, image: RemoteImage): Promise<void> {
+	const db = getD1Database(platform);
+	if (!db) {
+		return;
+	}
+
+	await ensureD1ImageIndexSchema(db);
+	const metadata = buildIndexMetadata(image);
+	const uploadedAtMs = toEpochMs(metadata.uploadedAt) ?? Date.now();
+	const takenAtMs = toEpochMs(metadata.takenAt);
+	const createdAtMs = toEpochMs(metadata.createdAt);
+	const objectKey = buildObjectKey(image.uuid, "original");
+	const nowMs = Date.now();
+	const metaJson = JSON.stringify(metadata);
+
+	await runAll(
+		db,
+		`INSERT INTO ${d1ImageIndexTableName}
+			(id, object_key, uploaded_at_ms, taken_at_ms, created_at_ms, meta_json, updated_at_ms)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(id) DO UPDATE SET
+			object_key = excluded.object_key,
+			uploaded_at_ms = excluded.uploaded_at_ms,
+			taken_at_ms = excluded.taken_at_ms,
+			created_at_ms = excluded.created_at_ms,
+			meta_json = excluded.meta_json,
+			updated_at_ms = excluded.updated_at_ms`,
+		[image.uuid, objectKey, uploadedAtMs, takenAtMs, createdAtMs, metaJson, nowMs],
+	);
+}
+
+async function deleteImageFromD1Index(platform: PlatformLike, id: string): Promise<void> {
+	const db = getD1Database(platform);
+	if (!db) {
+		return;
+	}
+
+	await ensureD1ImageIndexSchema(db);
+	await runAll(db, `DELETE FROM ${d1ImageIndexTableName} WHERE id = ?`, [id]);
+}
+
+function remoteImageFromD1IndexRow(row: D1ImageIndexRow): RemoteImage {
+	let parsedMetadata: Partial<ImageMetaData> = {};
+	try {
+		parsedMetadata = JSON.parse(row.meta_json) as Partial<ImageMetaData>;
+	} catch {
+		parsedMetadata = {};
+	}
+
+	const uploadedAtMs = parseD1Number(row.uploaded_at_ms);
+	const takenAtMs = parseD1Number(row.taken_at_ms);
+	const createdAtMs = parseD1Number(row.created_at_ms);
+	const inferredCategory = typeof parsedMetadata.category === "string" && parsedMetadata.category.trim()
+		? parsedMetadata.category
+		: "public";
+
+	const metadata = buildImageMetadata(inferredCategory, {
+		...parsedMetadata,
+		category: inferredCategory,
+		uploadedAt: parsedMetadata.uploadedAt ?? toIsoFromEpoch(uploadedAtMs),
+		takenAt: parsedMetadata.takenAt ?? toIsoFromEpoch(takenAtMs),
+		createdAt: parsedMetadata.createdAt ?? toIsoFromEpoch(createdAtMs),
+	});
+
+	return normalizeRemoteImage({
+		uuid: row.id,
+		category: inferredCategory,
+		name: metadata.originalName ?? row.id,
+		uploadedAt: metadata.uploadedAt,
+		meta: metadata,
+	});
+}
+
+async function listImagesFromD1IndexByCategory(
+	platform: PlatformLike,
+	category: string,
+	mode: ImageSortMode,
+	limit: number,
+	offset: number,
+): Promise<{ items: RemoteImage[]; totalItems: number }> {
+	const db = getD1Database(platform);
+	if (!db) {
+		return { items: [], totalItems: 0 };
+	}
+
+	await ensureD1ImageIndexSchema(db);
+	const countRow = await runFirst<{ count: number | string }>(
+		db,
+		`SELECT COUNT(*) AS count FROM ${d1ImageIndexTableName} WHERE json_extract(meta_json, '$.category') = ?`,
+		[category],
+	);
+	const rawCount = countRow?.count;
+	const totalItems = typeof rawCount === "number"
+		? rawCount
+		: typeof rawCount === "string"
+			? Number(rawCount)
+			: 0;
+
+	if (!Number.isFinite(totalItems) || totalItems <= 0) {
+		return { items: [], totalItems: 0 };
+	}
+
+	const orderBy = mode === "taken"
+		? `ORDER BY
+			(taken_at_ms IS NULL) ASC,
+			taken_at_ms DESC,
+			COALESCE(created_at_ms, uploaded_at_ms) DESC,
+			uploaded_at_ms DESC,
+			id DESC`
+		: `ORDER BY uploaded_at_ms DESC, id DESC`;
+
+	const rows = await runAll<D1ImageIndexRow>(
+		db,
+		`SELECT id, object_key, uploaded_at_ms, taken_at_ms, created_at_ms, meta_json, updated_at_ms
+		 FROM ${d1ImageIndexTableName}
+		 WHERE json_extract(meta_json, '$.category') = ?
+		 ${orderBy}
+		 LIMIT ? OFFSET ?`,
+		[category, limit, offset],
+	);
+
+	return {
+		items: rows.map((row) => remoteImageFromD1IndexRow(row)),
+		totalItems,
+	};
+}
+
 async function discoverLegacyTable(platform: PlatformLike, db: D1DatabaseLike): Promise<LegacyTableInfo | null> {
 	void platform;
 	try {
@@ -960,7 +1173,7 @@ export async function uploadImageToCloudflare(
 		customMetadata: serializeMetadata(nextMetadata),
 	});
 
-	return normalizeRemoteImage({
+	const uploadedImage = normalizeRemoteImage({
 		uuid: id,
 		category,
 		name: file.name,
@@ -968,6 +1181,8 @@ export async function uploadImageToCloudflare(
 		uploadedAt,
 		deliveryUrl: buildPublicUrl(id, "original"),
 	});
+	await upsertImageToD1Index(platform, uploadedImage);
+	return uploadedImage;
 }
 
 export async function listImagesPage(
@@ -978,6 +1193,19 @@ export async function listImagesPage(
 ): Promise<ImageListPage> {
 	try {
 		const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(200, Math.floor(limit))) : 24;
+		const cursorOffsetRaw = cursor ? Number.parseInt(cursor, 10) : 0;
+		const cursorOffset = Number.isFinite(cursorOffsetRaw) ? Math.max(0, cursorOffsetRaw) : 0;
+
+		const fromD1Index = await listImagesFromD1IndexByCategory(platform, category, "uploaded", safeLimit, cursorOffset);
+		if (fromD1Index.totalItems > 0) {
+			const nextOffset = cursorOffset + fromD1Index.items.length;
+			return {
+				items: fromD1Index.items,
+				nextCursor: nextOffset < fromD1Index.totalItems ? String(nextOffset) : null,
+				source: "d1-index",
+			};
+		}
+
 		const fromR2 = await listR2ImagesPageByCategory(platform, category, safeLimit, cursor);
 		if (fromR2.items.length > 0 || fromR2.nextCursor) {
 			return fromR2;
@@ -1003,12 +1231,69 @@ export async function listImagesPage(
 	}
 }
 
+export async function listImagesByCategoryPagedSorted(
+	platform: PlatformLike,
+	category: string,
+	mode: ImageSortMode,
+	page: number,
+	limit: number,
+): Promise<{ items: RemoteImage[]; totalItems: number; source: "d1-index" | "r2" | "d1-fallback" | "empty" }> {
+	const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(200, Math.floor(limit))) : 24;
+	const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
+	const offset = (safePage - 1) * safeLimit;
+
+	try {
+		const fromD1Index = await listImagesFromD1IndexByCategory(platform, category, mode, safeLimit, offset);
+		if (fromD1Index.totalItems > 0) {
+			return {
+				items: fromD1Index.items,
+				totalItems: fromD1Index.totalItems,
+				source: "d1-index",
+			};
+		}
+
+		const fromR2 = await listR2ImagesByCategory(platform, category);
+		if (fromR2.length > 0) {
+			const sorted = sortImagesByUploadedAt(fromR2, mode);
+			return {
+				items: sorted.slice(offset, offset + safeLimit),
+				totalItems: sorted.length,
+				source: "r2",
+			};
+		}
+
+		const fromD1 = await listLegacyImagesByCategory(platform, category);
+		if (fromD1.length > 0) {
+			const sorted = sortImagesByUploadedAt(fromD1, mode);
+			return {
+				items: sorted.slice(offset, offset + safeLimit),
+				totalItems: sorted.length,
+				source: "d1-fallback",
+			};
+		}
+
+		return { items: [], totalItems: 0, source: "empty" };
+	} catch (error) {
+		console.error("listImagesByCategoryPagedSorted failed", error);
+		return { items: [], totalItems: 0, source: "empty" };
+	}
+}
+
 export async function listImagesByCategorySorted(
 	platform: PlatformLike,
 	category: string,
 	mode: ImageSortMode = "uploaded",
-): Promise<{ items: RemoteImage[]; source: "r2" | "d1-fallback" | "empty" }> {
+): Promise<{ items: RemoteImage[]; source: "d1-index" | "r2" | "d1-fallback" | "empty" }> {
 	try {
+		const fromD1CountOnly = await listImagesFromD1IndexByCategory(platform, category, mode, 1, 0);
+		const d1Total = fromD1CountOnly.totalItems;
+		const fromD1Index = d1Total > 0
+			? await listImagesFromD1IndexByCategory(platform, category, mode, d1Total, 0)
+			: { items: [], totalItems: 0 };
+		if (fromD1Index.totalItems > 0) {
+			return { items: fromD1Index.items, source: "d1-index" };
+		}
+
 		const fromR2 = await listR2ImagesByCategory(platform, category);
 		if (fromR2.length > 0) {
 			return { items: sortImagesByUploadedAt(fromR2, mode), source: "r2" };
@@ -1124,6 +1409,8 @@ export async function deleteImageFromCloudflare(platform: PlatformLike, id: stri
 	for (const item of listing.objects) {
 		await bucket.delete(item.key);
 	}
+
+	await deleteImageFromD1Index(platform, id);
 }
 
 export function getImageDeliveryUrl(
@@ -1187,13 +1474,15 @@ export async function updateImageMetadata(
 	} else if (bucket) {
 		const target = storedObject;
 		if (!target) {
-			return normalizeRemoteImage({
+			const fallbackUpdated = normalizeRemoteImage({
 				...existing,
 				category: nextCategory,
 				name: nextMetadata.originalName,
 				uploadedAt: nextMetadata.uploadedAt,
 				meta: nextMetadata,
 			});
+			await upsertImageToD1Index(platform, fallbackUpdated);
+			return fallbackUpdated;
 		}
 		const body = await materializeObjectBody(target.object.body);
 		if (body) {
@@ -1211,13 +1500,15 @@ export async function updateImageMetadata(
 		}
 	}
 
-	return normalizeRemoteImage({
+	const updatedImage = normalizeRemoteImage({
 		...existing,
 		category: nextCategory,
 		name: nextMetadata.originalName,
 		uploadedAt: nextMetadata.uploadedAt,
 		meta: nextMetadata,
 	});
+	await upsertImageToD1Index(platform, updatedImage);
+	return updatedImage;
 }
 
 export async function migrateLegacyD1ToR2(platform: PlatformLike): Promise<{
@@ -1296,6 +1587,7 @@ export async function migrateLegacyD1ToR2(platform: PlatformLike): Promise<{
 				uploadedAt: image.uploadedAt ?? new Date().toISOString(),
 			},
 		});
+		await upsertImageToD1Index(platform, image);
 		migrated += 1;
 	}
 
@@ -1427,7 +1719,15 @@ export async function initializeAllOriginalMetadata(
 			);
 
 			const nextCustom = serializeMetadata(nextMeta);
+			const indexedImage = normalizeRemoteImage({
+				uuid: parsed.uuid,
+				category: resolvedCategory,
+				name: nextMeta.originalName ?? parsed.uuid,
+				uploadedAt: nextMeta.uploadedAt,
+				meta: nextMeta,
+			});
 			if (!metadataDiffers(item.customMetadata, nextCustom)) {
+				await upsertImageToD1Index(platform, indexedImage);
 				skipped += 1;
 				continue;
 			}
@@ -1451,6 +1751,7 @@ export async function initializeAllOriginalMetadata(
 				httpMetadata: fullObject.httpMetadata,
 				customMetadata: nextCustom,
 			});
+			await upsertImageToD1Index(platform, indexedImage);
 			updated += 1;
 		}
 
@@ -1469,12 +1770,147 @@ export async function initializeAllOriginalMetadata(
 	};
 }
 
+export async function initializeD1ImageIndex(
+	platform: PlatformLike,
+	options?: {
+		cursor?: string;
+		limit?: number;
+		maxPages?: number;
+		hydrateExif?: boolean;
+	},
+): Promise<{
+	scanned: number;
+	originals: number;
+	upserted: number;
+	skipped: number;
+	errors: number;
+	nextCursor: string | null;
+	done: boolean;
+}> {
+	const bucket = getR2Bucket(platform);
+	if (!bucket) {
+		throw new Error("R2 bucket binding is not configured.");
+	}
+
+	const db = getD1Database(platform);
+	if (!db) {
+		throw new Error("D1 binding is not configured.");
+	}
+	await ensureD1ImageIndexSchema(db);
+
+	const hydrateExif = options?.hydrateExif === true;
+	const limit = Number.isFinite(options?.limit)
+		? Math.max(20, Math.min(1000, Math.floor(options?.limit ?? 200)))
+		: 200;
+	const maxPages = Number.isFinite(options?.maxPages)
+		? Math.max(1, Math.min(50, Math.floor(options?.maxPages ?? 5)))
+		: 5;
+
+	let cursor = options?.cursor;
+	let truncated = true;
+	let pages = 0;
+	let scanned = 0;
+	let originals = 0;
+	let upserted = 0;
+	let skipped = 0;
+	let errors = 0;
+
+	while (truncated && pages < maxPages) {
+		pages += 1;
+		const listed = await bucket.list({
+			prefix: "images/",
+			limit,
+			cursor,
+			include: ["customMetadata"],
+		});
+		scanned += listed.objects.length;
+
+		for (const object of listed.objects) {
+			const parsed = parseOriginalKey(object.key);
+			if (!parsed) {
+				continue;
+			}
+			originals += 1;
+
+			const listedImage = imageFromListObject(object);
+			if (!listedImage) {
+				skipped += 1;
+				continue;
+			}
+
+			try {
+				let nextImage = listedImage;
+				const missingTakenOrCreated = !listedImage.meta?.takenAt || !listedImage.meta?.createdAt;
+				if (hydrateExif && missingTakenOrCreated) {
+					const fullObject = await bucket.get(object.key);
+					if (fullObject?.body) {
+						const body = await materializeObjectBody(fullObject.body);
+						if (body instanceof ArrayBuffer) {
+							const extracted = await extractExifMetadata(body);
+							if (extracted.takenAt || extracted.createdAt || extracted.exif) {
+								const mergedMeta = buildImageMetadata(listedImage.category, {
+									...listedImage.meta,
+									...extracted,
+									exif: {
+										...(listedImage.meta?.exif ?? {}),
+										...(extracted.exif ?? {}),
+									},
+								});
+								nextImage = normalizeRemoteImage({
+									...listedImage,
+									meta: mergedMeta,
+									uploadedAt: mergedMeta.uploadedAt,
+									name: mergedMeta.originalName ?? listedImage.name,
+								});
+							}
+						}
+					}
+				}
+
+				await upsertImageToD1Index(platform, nextImage);
+				upserted += 1;
+			} catch (error) {
+				console.error("initializeD1ImageIndex item failed", error);
+				errors += 1;
+			}
+		}
+
+		truncated = Boolean(listed.truncated);
+		cursor = listed.cursor;
+	}
+
+	return {
+		scanned,
+		originals,
+		upserted,
+		skipped,
+		errors,
+		nextCursor: truncated && cursor ? cursor : null,
+		done: !truncated,
+	};
+}
+
 export async function debugStorageSnapshot(platform: PlatformLike, category: string, sampleId?: string) {
 	const db = getD1Database(platform);
 	let legacyTable: LegacyTableInfo | null = null;
 	let legacyTotalCount: number | null = null;
+	let d1IndexCountByCategory: number | null = null;
 	if (db) {
 		legacyTable = await discoverLegacyTable(platform, db);
+		await ensureD1ImageIndexSchema(db);
+		const d1CountRow = await runFirst<{ count: number | string }>(
+			db,
+			`SELECT COUNT(*) AS count FROM ${d1ImageIndexTableName} WHERE json_extract(meta_json, '$.category') = ?`,
+			[category],
+		);
+		const d1RawCount = d1CountRow?.count;
+		if (typeof d1RawCount === "number") {
+			d1IndexCountByCategory = Number.isFinite(d1RawCount) ? d1RawCount : null;
+		} else if (typeof d1RawCount === "string") {
+			const parsed = Number(d1RawCount);
+			d1IndexCountByCategory = Number.isFinite(parsed) ? parsed : null;
+		}
+
 		if (legacyTable) {
 			const tableName = quoteIdentifier(legacyTable.name);
 			const countRow = await runFirst<{ count: number | string }>(db, `SELECT COUNT(*) AS count FROM ${tableName}`);
@@ -1503,6 +1939,7 @@ export async function debugStorageSnapshot(platform: PlatformLike, category: str
 		category,
 		legacyTable,
 		legacyTotalCount,
+		d1IndexCountByCategory,
 		r2CountEstimate: r2Page.items.length,
 		d1Count: d1Items.length,
 		nextCursor: r2Page.nextCursor,

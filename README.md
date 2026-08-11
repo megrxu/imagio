@@ -23,6 +23,7 @@ Imagio provides the following endpoints:
 
 - `/upload`: to upload images.
 - `/images`: to list and modify uploaded images.
+- `/admin/init-d1-index` (POST): initialize/backfill D1 image index from R2 objects (requires admin token).
 
 ## Local Cloudflare Runtime
 
@@ -36,3 +37,20 @@ Notes:
 
 - Local runtime config is in `wrangler.local.toml` (does not affect normal deployment flow).
 - To override local env vars, copy `.dev.vars.example` to `.dev.vars` and edit values.
+
+## D1 Image Index Migration
+
+Apply migration SQL before enabling D1-backed listing:
+
+```bash
+pnpm wrangler d1 migrations apply imagio-local --local --config wrangler.local.toml
+```
+
+Initialize/backfill data from R2 into D1 index:
+
+```bash
+curl -X POST http://127.0.0.1:8788/admin/init-d1-index \
+   -H 'Authorization: Bearer local-dev-token' \
+   -H 'content-type: application/json' \
+   -d '{"limit":200,"maxPages":5}'
+```

@@ -4,7 +4,7 @@
     export let nextHref: string | null = null;
     export let path = "/images";
     export let category = "public";
-    export let sort = "uploaded";
+    export let sort = "taken";
     export let limit = 24;
     export let currentPage = 1;
     export let totalPages = 1;
