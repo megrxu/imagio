@@ -463,6 +463,22 @@ function parseSortableTimestamp(value: string): number {
 function sortImagesByUploadedAt(images: RemoteImage[], mode: ImageSortMode = "uploaded"): RemoteImage[] {
 	const resolveTimestamp = mode === "taken" ? getImageTakenSortTimestamp : getImageSortTimestamp;
 	return [...images].sort((a, b) => {
+		if (mode === "taken") {
+			const aTakenRaw = a.meta?.takenAt ?? "";
+			const bTakenRaw = b.meta?.takenAt ?? "";
+			const aTaken = parseSortableTimestamp(aTakenRaw);
+			const bTaken = parseSortableTimestamp(bTakenRaw);
+			const aHasTaken = aTakenRaw.trim().length > 0 && aTaken !== Number.NEGATIVE_INFINITY;
+			const bHasTaken = bTakenRaw.trim().length > 0 && bTaken !== Number.NEGATIVE_INFINITY;
+
+			if (aHasTaken !== bHasTaken) {
+				return aHasTaken ? -1 : 1;
+			}
+			if (aHasTaken && bHasTaken && bTaken !== aTaken) {
+				return bTaken - aTaken;
+			}
+		}
+
 		const aValue = resolveTimestamp(a);
 		const bValue = resolveTimestamp(b);
 		const byTime = parseSortableTimestamp(bValue) - parseSortableTimestamp(aValue);

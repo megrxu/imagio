@@ -200,29 +200,31 @@
 
 <h1 class="title-page my-6 text-center">{$_("page.images.title")}</h1>
 
-<div class="m-auto my-8 flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 rounded border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
-	<div class="flex items-center gap-3">
-		<Button tag="a" href="/upload" size="sm" color="alternative">{$_("page.upload.upload")}</Button>
-		<Button size="sm" color="red" on:click={openConfirmBatch}
-			>{$_("page.images.batch_delete")}</Button
-		>
+<div class="card my-8 mx-auto w-full max-w-6xl">
+	<div class="card-body flex flex-wrap items-center justify-between gap-4 !p-4">
+		<div class="flex items-center gap-3">
+			<Button tag="a" href="/upload" size="sm" color="alternative">{$_("page.upload.upload")}</Button>
+			<Button size="sm" color="red" on:click={openConfirmBatch}
+				>{$_("page.images.batch_delete")}</Button
+			>
+		</div>
+		<form class="flex items-center gap-2" method="GET" action={path}>
+			<input type="hidden" name="category" value={category} />
+			<input type="hidden" name="limit" value={String(limit)} />
+			<input type="hidden" name="page" value="1" />
+			<label for="sort-mode" class="text-sm text-muted">排序方式</label>
+			<select
+				id="sort-mode"
+				name="sort"
+				bind:value={sort}
+				on:change={(event) => event.currentTarget.form?.requestSubmit()}
+				class="rounded border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm"
+			>
+				<option value="uploaded">上传时间</option>
+				<option value="taken">拍摄时间</option>
+			</select>
+		</form>
 	</div>
-	<form class="flex items-center gap-2" method="GET" action={path}>
-		<input type="hidden" name="category" value={category} />
-		<input type="hidden" name="limit" value={String(limit)} />
-		<input type="hidden" name="page" value="1" />
-		<label for="sort-mode" class="text-sm text-muted">排序方式</label>
-		<select
-			id="sort-mode"
-			name="sort"
-			bind:value={sort}
-			on:change={(event) => event.currentTarget.form?.requestSubmit()}
-			class="rounded border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm"
-		>
-			<option value="uploaded">上传时间</option>
-			<option value="taken">拍摄时间</option>
-		</select>
-	</form>
 </div>
 <Pagination
 	{prevHref}
