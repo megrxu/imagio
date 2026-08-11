@@ -30,7 +30,12 @@ export interface R2BucketLike {
 	): Promise<unknown>;
 	get(key: string): Promise<R2ObjectLike | null>;
 	delete(key: string): Promise<unknown>;
-	list(options?: { prefix?: string; limit?: number; cursor?: string }): Promise<R2ListResultLike>;
+	list(options?: {
+		prefix?: string;
+		limit?: number;
+		cursor?: string;
+		include?: Array<"httpMetadata" | "customMetadata">;
+	}): Promise<R2ListResultLike>;
 }
 
 interface D1StatementLike {
@@ -519,6 +524,7 @@ async function listR2ImagesByCategory(platform: PlatformLike, category: string):
 			prefix: "images/",
 			limit: 1000,
 			cursor,
+			include: ["customMetadata"],
 		});
 
 		for (const object of response.objects) {
@@ -666,6 +672,7 @@ async function listR2ImagesPageByCategory(
 			prefix: "images/",
 			limit: Math.max(limit * 2, 50),
 			cursor: nextCursor,
+			include: ["customMetadata"],
 		});
 
 		for (const object of response.objects) {
@@ -1356,6 +1363,7 @@ export async function initializeAllOriginalMetadata(
 			prefix: "images/",
 			limit,
 			cursor,
+			include: ["customMetadata"],
 		});
 		scanned += listed.objects.length;
 
