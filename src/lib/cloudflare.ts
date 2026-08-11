@@ -1329,6 +1329,7 @@ export async function initializeAllOriginalMetadata(
 			});
 
 			let fullObject: R2ObjectLike | null = null;
+			let objectBody: ArrayBuffer | string | null = null;
 			let extractedMeta: Partial<ImageMetaData> = {};
 			const needExifHydration =
 				withExif && (!existingMeta.exif || !existingMeta.takenAt || !existingMeta.createdAt);
@@ -1336,9 +1337,9 @@ export async function initializeAllOriginalMetadata(
 			if (needExifHydration) {
 				fullObject = await bucket.get(item.key);
 				if (fullObject?.body) {
-					const body = await materializeObjectBody(fullObject.body);
-					if (body instanceof ArrayBuffer) {
-						extractedMeta = await extractExifMetadata(body);
+					objectBody = await materializeObjectBody(fullObject.body);
+					if (objectBody instanceof ArrayBuffer) {
+						extractedMeta = await extractExifMetadata(objectBody);
 					}
 				}
 			}
@@ -1372,8 +1373,15 @@ export async function initializeAllOriginalMetadata(
 				errors += 1;
 				continue;
 			}
+			if (objectBody === null) {
+				objectBody = await materializeObjectBody(fullObject.body);
+			}
+			if (objectBody === null) {
+				errors += 1;
+				continue;
+			}
 
-			await bucket.put(item.key, fullObject.body, {
+			await bucket.put(item.key, objectBody, {
 				httpMetadata: fullObject.httpMetadata,
 				customMetadata: nextCustom,
 			});
