@@ -1,5 +1,8 @@
 <script lang="ts">
 	import {
+		Calendar,
+		Clock,
+		ArrowUp,
 		Copy,
 		MagnifyingGlass,
 		InfoCircled,
@@ -39,15 +42,6 @@
 		);
 	}
 
-	function buildSortHref(nextSort: "uploaded" | "taken") {
-		const params = new URLSearchParams();
-		params.set("category", category);
-		params.set("sort", nextSort);
-		params.set("limit", String(limit));
-		params.set("page", "1");
-		return `${path}?${params.toString()}`;
-	}
-
 	function getDisplayTitle(remoteImage: RemoteImage) {
 		const title = remoteImage.meta?.originalName ?? remoteImage.name;
 		if (!title || title === remoteImage.uuid) {
@@ -56,25 +50,49 @@
 		return title;
 	}
 
-	function getDisplayDate(remoteImage: RemoteImage) {
-		const value =
-			remoteImage.meta?.takenAt ??
-			remoteImage.meta?.createdAt ??
-			remoteImage.uploadedAt;
+	function formatMetaDate(value?: string) {
 		if (!value) {
 			return "";
 		}
 
 		const date = new Date(value);
-		if (Number.isNaN(date.getTime())) {
-			return value.slice(0, 10);
+		if (!Number.isNaN(date.getTime())) {
+			const year = date.getFullYear();
+			const month = String(date.getMonth() + 1).padStart(2, "0");
+			const day = String(date.getDate()).padStart(2, "0");
+			return `${year}-${month}-${day}`;
 		}
 
-		return date.toLocaleDateString("zh-CN", {
-			year: "numeric",
-			month: "2-digit",
-			day: "2-digit",
-		});
+		const matched = value.match(/^(\d{4})[/:.-](\d{1,2})[/:.-](\d{1,2})/);
+		if (!matched) {
+			return value;
+		}
+
+		const [, year, month, day] = matched;
+		return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+	}
+
+	function getDisplayMetaRows(remoteImage: RemoteImage) {
+		return [
+			{
+				key: "taken",
+				label: "拍摄",
+				value: formatMetaDate(remoteImage.meta?.takenAt),
+				icon: Calendar,
+			},
+			{
+				key: "created",
+				label: "创建",
+				value: formatMetaDate(remoteImage.meta?.createdAt),
+				icon: Clock,
+			},
+			{
+				key: "uploaded",
+				label: "上传",
+				value: formatMetaDate(remoteImage.meta?.uploadedAt ?? remoteImage.uploadedAt),
+				icon: ArrowUp,
+			},
+		].filter((item) => item.value);
 	}
 
 	// 如果進行了路由參數切換（例如分頁或分類導航），同步重置本地狀態
@@ -305,7 +323,15 @@
 				{#if getDisplayTitle(remoteImage)}
 					<div class="truncate">{getDisplayTitle(remoteImage)}</div>
 				{/if}
-				<div>{getDisplayDate(remoteImage)}</div>
+				<div class="space-y-1">
+					{#each getDisplayMetaRows(remoteImage) as metaRow (metaRow.key)}
+						<div class="flex items-center gap-2 leading-5">
+							<svelte:component this={metaRow.icon} class="h-3.5 w-3.5 shrink-0 text-muted" />
+							<span class="w-8 shrink-0 text-[11px] text-muted/80">{metaRow.label}</span>
+							<span class="min-w-0 truncate tabular-nums">{metaRow.value}</span>
+						</div>
+					{/each}
+				</div>
 			</div>
 		</div>
 	{/each}

@@ -427,9 +427,51 @@ function getImageTakenSortTimestamp(image: RemoteImage): string {
 	return image.meta?.takenAt ?? image.meta?.createdAt ?? image.meta?.uploadedAt ?? image.uploadedAt ?? "";
 }
 
+function parseSortableTimestamp(value: string): number {
+	const trimmed = value.trim();
+	if (!trimmed) return Number.NEGATIVE_INFINITY;
+
+	const direct = Date.parse(trimmed);
+	if (Number.isFinite(direct)) {
+		return direct;
+	}
+
+	const normalizedSlash = trimmed.replace(/\//g, "-");
+	const slashParsed = Date.parse(normalizedSlash);
+	if (Number.isFinite(slashParsed)) {
+		return slashParsed;
+	}
+
+	const exifStyle = trimmed.match(/^(\d{4}):(\d{1,2}):(\d{1,2})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+	if (exifStyle) {
+		const [, year, month, day, hour = "0", minute = "0", second = "0"] = exifStyle;
+		const isoLike = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T${hour.padStart(2, "0")}:${minute.padStart(2, "0")}:${second.padStart(2, "0")}`;
+		const exifParsed = Date.parse(isoLike);
+		if (Number.isFinite(exifParsed)) {
+			return exifParsed;
+		}
+	}
+
+	return Number.NEGATIVE_INFINITY;
+}
+
 function sortImagesByUploadedAt(images: RemoteImage[], mode: ImageSortMode = "uploaded"): RemoteImage[] {
 	const resolveTimestamp = mode === "taken" ? getImageTakenSortTimestamp : getImageSortTimestamp;
-	return [...images].sort((a, b) => resolveTimestamp(b).localeCompare(resolveTimestamp(a)));
+	return [...images].sort((a, b) => {
+		const aValue = resolveTimestamp(a);
+		const bValue = resolveTimestamp(b);
+		const byTime = parseSortableTimestamp(bValue) - parseSortableTimestamp(aValue);
+		if (byTime !== 0) {
+			return byTime;
+		}
+
+		const byUploaded = parseSortableTimestamp(getImageSortTimestamp(b)) - parseSortableTimestamp(getImageSortTimestamp(a));
+		if (byUploaded !== 0) {
+			return byUploaded;
+		}
+
+		return bValue.localeCompare(aValue);
+	});
 }
 
 type ListedImageCandidate = {
