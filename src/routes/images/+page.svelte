@@ -24,6 +24,7 @@
 	let path = data.path;
 	let prevHref = data.prevHref;
 	let nextHref = data.nextHref;
+	let sort = data.sort;
 	let limit = data.limit;
 	let currentPage = data.currentPage;
 	let totalPages = data.totalPages;
@@ -31,6 +32,21 @@
 	let imageLoaded: Record<string, boolean> = Object.fromEntries(
 		remoteImages.map((item) => [item.uuid, false]),
 	);
+
+	function deriveImageLoadedState(images: RemoteImage[], previous: Record<string, boolean>) {
+		return Object.fromEntries(
+			images.map((item) => [item.uuid, previous[item.uuid] ?? false]),
+		);
+	}
+
+	function buildSortHref(nextSort: "uploaded" | "taken") {
+		const params = new URLSearchParams();
+		params.set("category", category);
+		params.set("sort", nextSort);
+		params.set("limit", String(limit));
+		params.set("page", "1");
+		return `${path}?${params.toString()}`;
+	}
 
 	function getDisplayTitle(remoteImage: RemoteImage) {
 		const title = remoteImage.meta?.originalName ?? remoteImage.name;
@@ -72,6 +88,7 @@
 		data.nextHref !== nextHref
 	) {
 		category = data.category;
+		sort = data.sort;
 		path = data.path;
 		currentPage = data.currentPage;
 		totalPages = data.totalPages;
@@ -80,9 +97,7 @@
 		nextHref = data.nextHref;
 		limit = data.limit;
 		remoteImages = [...data.remoteImages];
-		imageLoaded = Object.fromEntries(
-			remoteImages.map((item) => [item.uuid, false]),
-		);
+		imageLoaded = deriveImageLoadedState(remoteImages, imageLoaded);
 		checked_ids = {};
 	}
 
@@ -167,17 +182,36 @@
 
 <h1 class="title-page my-6 text-center">{$_("page.images.title")}</h1>
 
-<div class="m-auto my-8 flex items-center justify-center gap-4">
-	<Button tag="a" href="/upload" size="sm" color="alternative">{$_("page.upload.upload")}</Button>
-	<Button size="sm" color="red" on:click={openConfirmBatch}
-		>{$_("page.images.batch_delete")}</Button
-	>
+<div class="m-auto my-8 flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 rounded border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
+	<div class="flex items-center gap-3">
+		<Button tag="a" href="/upload" size="sm" color="alternative">{$_("page.upload.upload")}</Button>
+		<Button size="sm" color="red" on:click={openConfirmBatch}
+			>{$_("page.images.batch_delete")}</Button
+		>
+	</div>
+	<form class="flex items-center gap-2" method="GET" action={path}>
+		<input type="hidden" name="category" value={category} />
+		<input type="hidden" name="limit" value={String(limit)} />
+		<input type="hidden" name="page" value="1" />
+		<label for="sort-mode" class="text-sm text-muted">排序方式</label>
+		<select
+			id="sort-mode"
+			name="sort"
+			bind:value={sort}
+			on:change={(event) => event.currentTarget.form?.requestSubmit()}
+			class="rounded border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm"
+		>
+			<option value="uploaded">上传时间</option>
+			<option value="taken">拍摄时间</option>
+		</select>
+	</form>
 </div>
 <Pagination
 	{prevHref}
 	{nextHref}
 	{path}
 	{category}
+	{sort}
 	{limit}
 	{currentPage}
 	{totalPages}
@@ -281,6 +315,7 @@
 	{nextHref}
 	{path}
 	{category}
+	{sort}
 	{limit}
 	{currentPage}
 	{totalPages}

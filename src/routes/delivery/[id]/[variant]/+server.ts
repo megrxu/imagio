@@ -311,6 +311,17 @@ export async function GET({ request, params: { id, variant }, platform }) {
     for (const key of candidates) {
         const object = await getOrMigrateObject(platform, key, {
             migrateFromLegacy: key.endsWith('/original'),
+            customMetadata: key.endsWith('/original')
+                ? {
+                    category: image.category,
+                    originalName: image.meta?.originalName ?? image.name ?? id,
+                    uploadedAt: image.meta?.uploadedAt ?? image.uploadedAt ?? '',
+                    tags: JSON.stringify(image.meta?.tags ?? []),
+                    takenAt: image.meta?.takenAt ?? '',
+                    createdAt: image.meta?.createdAt ?? '',
+                    exif: image.meta?.exif ? JSON.stringify(image.meta.exif) : '',
+                }
+                : undefined,
             legacySourceKeys: buildLegacySourceCandidates(
                 id,
                 imageCategory,

@@ -65,6 +65,8 @@ export type ImageListPage = {
 	source: "r2" | "d1-fallback" | "empty";
 };
 
+export type ImageSortMode = "uploaded" | "taken";
+
 const fixedLegacyTable: LegacyTableInfo = { name: "images", idColumn: "uuid" };
 const defaultCategoryCandidates = ["public", "private"];
 const exifPickKeys = [
@@ -412,13 +414,49 @@ function normalizeRemoteImage(input: Partial<RemoteImage> & { uuid: string; cate
 		category: input.category,
 		name: input.name ?? metadata.originalName ?? input.uuid,
 		deliveryUrl: input.deliveryUrl ?? buildPublicUrl(input.uuid, "original"),
-		uploadedAt: metadata.uploadedAt ?? new Date().toISOString(),
+		uploadedAt: metadata.uploadedAt,
 		meta: metadata,
 	};
 }
 
-function sortImagesByUploadedAt(images: RemoteImage[]): RemoteImage[] {
-	return [...images].sort((a, b) => (b.uploadedAt ?? "").localeCompare(a.uploadedAt ?? ""));
+function getImageSortTimestamp(image: RemoteImage): string {
+	return image.meta?.uploadedAt ?? image.meta?.createdAt ?? image.uploadedAt ?? "";
+}
+
+function getImageTakenSortTimestamp(image: RemoteImage): string {
+	return image.meta?.takenAt ?? image.meta?.createdAt ?? image.meta?.uploadedAt ?? image.uploadedAt ?? "";
+}
+
+function sortImagesByUploadedAt(images: RemoteImage[], mode: ImageSortMode = "uploaded"): RemoteImage[] {
+	const resolveTimestamp = mode === "taken" ? getImageTakenSortTimestamp : getImageSortTimestamp;
+	return [...images].sort((a, b) => resolveTimestamp(b).localeCompare(resolveTimestamp(a)));
+}
+
+type ListedImageCandidate = {
+	image: RemoteImage;
+	hasUploadedAtMetadata: boolean;
+	hasCategoryMetadata: boolean;
+	isLegacyCategoryKey: boolean;
+};
+
+function scoreListedImageCandidate(candidate: ListedImageCandidate): number {
+	let score = 0;
+	if (candidate.hasUploadedAtMetadata) score += 8;
+	if (candidate.hasCategoryMetadata) score += 4;
+	if (candidate.isLegacyCategoryKey) score += 2;
+	return score;
+}
+
+function shouldReplaceListedImageCandidate(current: ListedImageCandidate, next: ListedImageCandidate): boolean {
+	const currentScore = scoreListedImageCandidate(current);
+	const nextScore = scoreListedImageCandidate(next);
+	if (nextScore !== currentScore) {
+		return nextScore > currentScore;
+	}
+
+	const currentUploaded = getImageSortTimestamp(current.image);
+	const nextUploaded = getImageSortTimestamp(next.image);
+	return nextUploaded.localeCompare(currentUploaded) > 0;
 }
 
 async function listR2ImagesByCategory(platform: PlatformLike, category: string): Promise<RemoteImage[]> {
@@ -427,8 +465,7 @@ async function listR2ImagesByCategory(platform: PlatformLike, category: string):
 		return [];
 	}
 
-	const items: RemoteImage[] = [];
-	const seen = new Set<string>();
+	const selected = new Map<string, ListedImageCandidate>();
 	let cursor: string | undefined;
 	let truncated = true;
 	let loops = 0;
@@ -443,19 +480,20 @@ async function listR2ImagesByCategory(platform: PlatformLike, category: string):
 		});
 
 		for (const object of response.objects) {
-			const image = imageFromListObject(object);
-			if (!image) continue;
-			if (image.category !== category) continue;
-			if (seen.has(image.uuid)) continue;
-			seen.add(image.uuid);
-			items.push(image);
+			const candidate = listedImageCandidateFromObject(object);
+			if (!candidate) continue;
+			if (candidate.image.category !== category) continue;
+			const current = selected.get(candidate.image.uuid);
+			if (!current || shouldReplaceListedImageCandidate(current, candidate)) {
+				selected.set(candidate.image.uuid, candidate);
+			}
 		}
 
 		truncated = Boolean(response.truncated);
 		cursor = response.cursor;
 	}
 
-	return sortImagesByUploadedAt(items);
+	return sortImagesByUploadedAt(Array.from(selected.values()).map((entry) => entry.image));
 }
 
 function parseOriginalKey(key: string): { category?: string; uuid: string } | null {
@@ -476,7 +514,7 @@ function getUploadedIso(uploaded?: Date | string, customUploadedAt?: string) {
 	if (typeof customUploadedAt === "string" && customUploadedAt) {
 		return customUploadedAt;
 	}
-	if (!uploaded) return new Date().toISOString();
+	if (!uploaded) return undefined;
 	if (uploaded instanceof Date) return uploaded.toISOString();
 	return uploaded;
 }
@@ -515,6 +553,21 @@ function imageFromListObject(item: R2ListObjectLike): RemoteImage | null {
 		uploadedAt: metadata.uploadedAt,
 		meta: metadata,
 	});
+}
+
+function listedImageCandidateFromObject(item: R2ListObjectLike): ListedImageCandidate | null {
+	const parsed = parseOriginalKey(item.key);
+	if (!parsed) return null;
+
+	const image = imageFromListObject(item);
+	if (!image) return null;
+
+	return {
+		image,
+		hasUploadedAtMetadata: typeof item.customMetadata?.uploadedAt === "string" && item.customMetadata.uploadedAt.trim().length > 0,
+		hasCategoryMetadata: typeof item.customMetadata?.category === "string" && item.customMetadata.category.trim().length > 0,
+		isLegacyCategoryKey: Boolean(parsed.category),
+	};
 }
 
 async function findStoredOriginalObject(
@@ -561,12 +614,11 @@ async function listR2ImagesPageByCategory(
 
 	let nextCursor: string | undefined = cursor;
 	let truncated = true;
-	const items: RemoteImage[] = [];
-	const seen = new Set<string>();
+	const selected = new Map<string, ListedImageCandidate>();
 	let loops = 0;
 	const maxLoops = 6;
 
-	while (items.length < limit && truncated && loops < maxLoops) {
+	while (selected.size < limit && truncated && loops < maxLoops) {
 		loops += 1;
 		const response = await bucket.list({
 			prefix: "images/",
@@ -575,19 +627,23 @@ async function listR2ImagesPageByCategory(
 		});
 
 		for (const object of response.objects) {
-			const image = imageFromListObject(object);
-			if (!image) continue;
-			if (image.category !== category) continue;
-			if (seen.has(image.uuid)) continue;
-			seen.add(image.uuid);
-			items.push(image);
-			if (items.length >= limit) break;
+			const candidate = listedImageCandidateFromObject(object);
+			if (!candidate) continue;
+			if (candidate.image.category !== category) continue;
+
+			const current = selected.get(candidate.image.uuid);
+			if (!current || shouldReplaceListedImageCandidate(current, candidate)) {
+				selected.set(candidate.image.uuid, candidate);
+			}
+
+			if (selected.size >= limit) break;
 		}
 
 		truncated = Boolean(response.truncated);
 		nextCursor = response.cursor;
 	}
 
+	const items = Array.from(selected.values()).map((entry) => entry.image);
 	return {
 		items: sortImagesByUploadedAt(items).slice(0, limit),
 		nextCursor: truncated && nextCursor ? nextCursor : null,
@@ -762,7 +818,11 @@ async function tryReadLegacyObject(platform: PlatformLike, sourceKey: string): P
 export async function getOrMigrateObject(
 	platform: PlatformLike,
 	key: string,
-	options?: { migrateFromLegacy?: boolean; legacySourceKeys?: string[] },
+	options?: {
+		migrateFromLegacy?: boolean;
+		legacySourceKeys?: string[];
+		customMetadata?: Record<string, string>;
+	},
 ): Promise<R2ObjectLike | null> {
 	const bucket = getR2Bucket(platform);
 	if (!bucket) {
@@ -784,10 +844,12 @@ export async function getOrMigrateObject(
 
 		await bucket.put(key, legacy.body, {
 			httpMetadata: legacy.contentType ? { contentType: legacy.contentType } : undefined,
+			customMetadata: options?.customMetadata,
 		});
 		return {
 			body: legacy.body,
 			httpMetadata: legacy.contentType ? { contentType: legacy.contentType } : undefined,
+			customMetadata: options?.customMetadata,
 		};
 	}
 
@@ -879,16 +941,17 @@ export async function listImagesPage(
 export async function listImagesByCategorySorted(
 	platform: PlatformLike,
 	category: string,
+	mode: ImageSortMode = "uploaded",
 ): Promise<{ items: RemoteImage[]; source: "r2" | "d1-fallback" | "empty" }> {
 	try {
 		const fromR2 = await listR2ImagesByCategory(platform, category);
 		if (fromR2.length > 0) {
-			return { items: fromR2, source: "r2" };
+			return { items: sortImagesByUploadedAt(fromR2, mode), source: "r2" };
 		}
 
 		const fromD1 = await listLegacyImagesByCategory(platform, category);
 		if (fromD1.length > 0) {
-			return { items: fromD1, source: "d1-fallback" };
+			return { items: sortImagesByUploadedAt(fromD1, mode), source: "d1-fallback" };
 		}
 
 		return { items: [], source: "empty" };
@@ -909,6 +972,8 @@ export async function getImageById(
 	categoryHint?: string,
 ): Promise<RemoteImage | null> {
 	try {
+		const legacyByHint = await getLegacyImageById(platform, id, categoryHint);
+
 		const storedObject = await findStoredOriginalObject(platform, id, categoryHint);
 		if (storedObject) {
 			const metadata = metadataFromCustomMetadata(storedObject.object.customMetadata, storedObject.resolvedCategory, {
@@ -935,22 +1000,34 @@ export async function getImageById(
 		const migrated = await getOrMigrateObject(platform, canonicalKey, {
 			migrateFromLegacy: true,
 			legacySourceKeys: legacyCandidates,
+			customMetadata: legacyByHint
+				? serializeMetadata(
+					buildImageMetadata(legacyByHint.category, legacyByHint.meta, {
+						originalName: legacyByHint.name ?? id,
+						uploadedAt: legacyByHint.uploadedAt,
+					}),
+				)
+				: undefined,
 		});
 		if (migrated?.body) {
+			if (legacyByHint) {
+				return legacyByHint;
+			}
+
 			const resolvedCategory = categoryHint || "public";
+			const metadata = metadataFromCustomMetadata(migrated.customMetadata, resolvedCategory, {
+				originalName: id,
+				uploadedAt: migrated.customMetadata?.uploadedAt,
+			});
 			return normalizeRemoteImage({
 				uuid: id,
 				category: resolvedCategory,
-				name: id,
-				uploadedAt: undefined,
-				meta: {
-					tags: [],
-					category: resolvedCategory,
-				},
+				name: metadata.originalName ?? id,
+				uploadedAt: metadata.uploadedAt,
+				meta: metadata,
 			});
 		}
 
-		const legacyByHint = await getLegacyImageById(platform, id, categoryHint);
 		if (legacyByHint) {
 			return legacyByHint;
 		}
@@ -1168,6 +1245,153 @@ export async function migrateLegacyD1ToR2(platform: PlatformLike): Promise<{
 			legacyFetchMiss,
 			sampleMisses,
 		},
+	};
+}
+
+function metadataDiffers(
+	current: Record<string, string> | undefined,
+	next: Record<string, string>,
+): boolean {
+	for (const [key, value] of Object.entries(next)) {
+		if ((current?.[key] ?? "") !== value) {
+			return true;
+		}
+	}
+
+	const relevantKeys = new Set(["category", "originalName", "tags", "uploadedAt", "takenAt", "createdAt", "exif"]);
+	for (const key of Object.keys(current ?? {})) {
+		if (!relevantKeys.has(key)) continue;
+		if (!(key in next) && (current?.[key] ?? "") !== "") {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+export async function initializeAllOriginalMetadata(
+	platform: PlatformLike,
+	options?: {
+		cursor?: string;
+		limit?: number;
+		withExif?: boolean;
+		maxPages?: number;
+	},
+): Promise<{
+	scanned: number;
+	originals: number;
+	updated: number;
+	skipped: number;
+	errors: number;
+	nextCursor: string | null;
+	done: boolean;
+}> {
+	const bucket = getR2Bucket(platform);
+	if (!bucket) {
+		throw new Error("R2 bucket binding is not configured.");
+	}
+
+	const withExif = options?.withExif !== false;
+	const limit = Number.isFinite(options?.limit)
+		? Math.max(20, Math.min(1000, Math.floor(options?.limit ?? 200)))
+		: 200;
+	const maxPages = Number.isFinite(options?.maxPages)
+		? Math.max(1, Math.min(50, Math.floor(options?.maxPages ?? 5)))
+		: 5;
+
+	let cursor = options?.cursor;
+	let truncated = true;
+	let pages = 0;
+	let scanned = 0;
+	let originals = 0;
+	let updated = 0;
+	let skipped = 0;
+	let errors = 0;
+
+	while (truncated && pages < maxPages) {
+		pages += 1;
+		const listed = await bucket.list({
+			prefix: "images/",
+			limit,
+			cursor,
+		});
+		scanned += listed.objects.length;
+
+		for (const item of listed.objects) {
+			const parsed = parseOriginalKey(item.key);
+			if (!parsed) continue;
+			originals += 1;
+
+			const resolvedCategory = item.customMetadata?.category || parsed.category || "public";
+			const existingMeta = metadataFromCustomMetadata(item.customMetadata, resolvedCategory, {
+				originalName: parsed.uuid,
+				uploadedAt: getUploadedIso(item.uploaded, item.customMetadata?.uploadedAt),
+			});
+
+			let fullObject: R2ObjectLike | null = null;
+			let extractedMeta: Partial<ImageMetaData> = {};
+			const needExifHydration =
+				withExif && (!existingMeta.exif || !existingMeta.takenAt || !existingMeta.createdAt);
+
+			if (needExifHydration) {
+				fullObject = await bucket.get(item.key);
+				if (fullObject?.body) {
+					const body = await materializeObjectBody(fullObject.body);
+					if (body instanceof ArrayBuffer) {
+						extractedMeta = await extractExifMetadata(body);
+					}
+				}
+			}
+
+			const nextMeta = buildImageMetadata(
+				resolvedCategory,
+				{
+					...existingMeta,
+					...extractedMeta,
+					exif: {
+						...(existingMeta.exif ?? {}),
+						...(extractedMeta.exif ?? {}),
+					},
+				},
+				{
+					originalName: existingMeta.originalName ?? parsed.uuid,
+					uploadedAt: existingMeta.uploadedAt ?? getUploadedIso(item.uploaded, item.customMetadata?.uploadedAt),
+				},
+			);
+
+			const nextCustom = serializeMetadata(nextMeta);
+			if (!metadataDiffers(item.customMetadata, nextCustom)) {
+				skipped += 1;
+				continue;
+			}
+
+			if (!fullObject) {
+				fullObject = await bucket.get(item.key);
+			}
+			if (!fullObject?.body) {
+				errors += 1;
+				continue;
+			}
+
+			await bucket.put(item.key, fullObject.body, {
+				httpMetadata: fullObject.httpMetadata,
+				customMetadata: nextCustom,
+			});
+			updated += 1;
+		}
+
+		truncated = Boolean(listed.truncated);
+		cursor = listed.cursor;
+	}
+
+	return {
+		scanned,
+		originals,
+		updated,
+		skipped,
+		errors,
+		nextCursor: truncated && cursor ? cursor : null,
+		done: !truncated,
 	};
 }
 

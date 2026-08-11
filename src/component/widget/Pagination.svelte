@@ -4,6 +4,7 @@
     export let nextHref: string | null = null;
     export let path = "/images";
     export let category = "public";
+    export let sort = "uploaded";
     export let limit = 24;
     export let currentPage = 1;
     export let totalPages = 1;
@@ -18,6 +19,7 @@
     function buildHref(page: number) {
         const params = new URLSearchParams();
         params.set("category", category);
+        params.set("sort", sort);
         params.set("limit", String(limit));
         params.set("page", String(page));
         return `${path}?${params.toString()}`;
@@ -102,6 +104,7 @@
 
     <form class="flex items-center gap-2" method="GET" action={path}>
         <input type="hidden" name="category" value={category} />
+        <input type="hidden" name="sort" value={sort} />
         <input type="hidden" name="limit" value={String(limit)} />
         <label for="jump-page" class="text-xs text-muted">跳到</label>
         <input

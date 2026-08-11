@@ -1,14 +1,19 @@
 import type { RemoteImage } from '$lib/types';
 import type { PageServerLoad } from './$types';
-import { buildSignedDeliveryUrl, listImagesByCategorySorted } from '$lib/cloudflare';
+import { buildSignedDeliveryUrl, listImagesByCategorySorted, type ImageSortMode } from '$lib/cloudflare';
+
+function normalizeSortMode(raw: string | null): ImageSortMode {
+    return raw === 'taken' ? 'taken' : 'uploaded';
+}
 
 export const load: PageServerLoad = async ({ url, platform }) => {
     const category = url.searchParams.get('category') ?? 'public';
+    const sort = normalizeSortMode(url.searchParams.get('sort'));
     const pageRaw = parseInt(url.searchParams.get('page') ?? '1', 10);
     const page = Number.isFinite(pageRaw) ? Math.max(1, pageRaw) : 1;
     const limit = Math.max(1, Math.min(48, parseInt(url.searchParams.get('limit') ?? '24', 10)));
 
-    const result = await listImagesByCategorySorted(platform, category);
+    const result = await listImagesByCategorySorted(platform, category, sort);
     const allImages = result.items;
     const totalItems = allImages.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / limit));
@@ -24,10 +29,10 @@ export const load: PageServerLoad = async ({ url, platform }) => {
     const prevPage = currentPage > 1 ? currentPage - 1 : null;
     const nextPage = currentPage < totalPages ? currentPage + 1 : null;
     const prevHref = prevPage
-        ? `${url.pathname}?category=${encodeURIComponent(category)}&limit=${limit}&page=${prevPage}`
+        ? `${url.pathname}?category=${encodeURIComponent(category)}&sort=${encodeURIComponent(sort)}&limit=${limit}&page=${prevPage}`
         : null;
     const nextHref = nextPage
-        ? `${url.pathname}?category=${encodeURIComponent(category)}&limit=${limit}&page=${nextPage}`
+        ? `${url.pathname}?category=${encodeURIComponent(category)}&sort=${encodeURIComponent(sort)}&limit=${limit}&page=${nextPage}`
         : null;
 
     return {
@@ -41,5 +46,6 @@ export const load: PageServerLoad = async ({ url, platform }) => {
         totalPages,
         totalItems,
         path: url.pathname,
+        sort,
     }
 }
