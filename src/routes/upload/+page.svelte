@@ -3,11 +3,11 @@
 	import SubmitProgress from "../../component/widget/SubmitProgress.svelte";
 	import { _ } from "svelte-i18n";
 	import { goto } from "$app/navigation";
-	import { Alert, Label, Select, Button, Spinner } from "flowbite-svelte";
+	import { Alert, Button, Spinner } from "flowbite-svelte";
 	import { notify } from "$lib/ui/notifications";
 
 	let files: FileList | undefined;
-	let category: string = "public";
+	const uploadCategory = "public";
 	let placeholder: boolean = true;
 	let uploading = false;
 	let uploaded = 0;
@@ -73,7 +73,7 @@
 			for (const image of images) {
 				const formData = new FormData();
 				formData.append("file", image.file);
-				const resp = await fetch(`/upload/${category}`, {
+				const resp = await fetch(`/upload/${uploadCategory}`, {
 					method: "PUT",
 					body: formData,
 				});
@@ -84,7 +84,7 @@
 				uploaded = Math.floor((uploadedCnt / files.length) * 100);
 			}
 			notify.success(`已成功上传 ${uploadedCnt} 张图片`);
-			await goto(`/images?category=${category}`);
+			await goto(`/images?category=${uploadCategory}`);
 		} catch (error) {
 			uploadError = error instanceof Error ? error.message : String(error);
 			notify.error("上传失败，请检查图片格式或 Cloudflare 配置。");
@@ -98,23 +98,14 @@
 {#if alert}
 	<Alert color="red" class="mb-4">{alert}</Alert>
 {/if}
-<div class="mb-4 card">
-	<div class="card-body">
-		<Label for="upload-category" class="mb-2">{$_("term.category")}</Label>
-		<Select id="upload-category" bind:value={category} class="w-full">
-			<option value="public">public</option>
-			<option value="private">private</option>
-		</Select>
-	</div>
-</div>
 <div class="action-bar justify-center">
 	<label for="uploads" class="cursor-pointer">
-		<Button size="sm" pill color="alternative">{$_("page.upload.select")}</Button>
+		<Button size="sm" color="alternative">{$_("page.upload.select")}</Button>
 	</label>
-	<Button tag="a" href={`/images?category=${category}`} size="sm" pill color="alternative">
+	<Button tag="a" href={`/images?category=${uploadCategory}`} size="sm" color="alternative">
 		{$_("term.gallery")}
 	</Button>
-	<Button size="sm" pill color="green" on:click={doUpload} disabled={uploading}>
+	<Button size="sm" color="green" on:click={doUpload} disabled={uploading}>
 		{#if uploading}
 			<Spinner size="4" class="mr-2" />
 		{/if}
@@ -156,7 +147,7 @@
 				{#each images as image}
 					<div>
 						<figure>
-							<img src={String(image.src)} alt="" class="rounded-md object-cover h-32 w-full" />
+							<img src={String(image.src)} alt="" class="rounded-sm object-cover h-32 w-full" />
 						</figure>
 					</div>
 				{/each}

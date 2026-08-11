@@ -1,5 +1,5 @@
-import type { ImageMetaData } from "$lib/types";
-import { updateImageMetadata } from "$lib/cloudflare";
+import type { ImageMetaData } from '$lib/types';
+import { updateImageMetadata } from '$lib/cloudflare';
 
 export async function PATCH({ request, params: { id }, platform }) {
     const meta: ImageMetaData = JSON.parse(await request.text());

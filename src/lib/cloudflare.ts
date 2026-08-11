@@ -1,4 +1,5 @@
-import type { ImageMetaData, RemoteImage } from "$lib/types";
+import exifr from "exifr";
+import type { ImageExifMetadata, ImageMetaData, RemoteImage } from "$lib/types";
 
 export interface R2ObjectLike {
 	body?: ReadableStream | ArrayBuffer | string | null;
@@ -66,6 +67,18 @@ export type ImageListPage = {
 
 const fixedLegacyTable: LegacyTableInfo = { name: "images", idColumn: "uuid" };
 const defaultCategoryCandidates = ["public", "private"];
+const exifPickKeys = [
+	"Make",
+	"Model",
+	"LensModel",
+	"DateTimeOriginal",
+	"CreateDate",
+	"ModifyDate",
+	"ISO",
+	"FocalLength",
+	"FNumber",
+	"ExposureTime",
+] as const;
 
 function getEnv(platform: PlatformLike): CloudflareEnv {
 	const env = platform?.env ?? {};
@@ -159,17 +172,184 @@ function parseTags(value: unknown): string[] {
 	return [];
 }
 
+async function materializeObjectBody(body: R2ObjectLike["body"]): Promise<ArrayBuffer | string | null> {
+	if (body == null) {
+		return null;
+	}
+	if (typeof body === "string" || body instanceof ArrayBuffer) {
+		return body;
+	}
+	return await new Response(body).arrayBuffer();
+}
+
+function toIsoString(value: unknown): string | undefined {
+	if (value instanceof Date && !Number.isNaN(value.getTime())) {
+		return value.toISOString();
+	}
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		return trimmed || undefined;
+	}
+	return undefined;
+}
+
+function toNumber(value: unknown): number | undefined {
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return value;
+	}
+	if (typeof value === "string") {
+		const parsed = Number(value);
+		if (Number.isFinite(parsed)) {
+			return parsed;
+		}
+	}
+	return undefined;
+}
+
+function normalizeExifMetadata(input: unknown): ImageExifMetadata | undefined {
+	if (!input || typeof input !== "object") {
+		return undefined;
+	}
+
+	const source = input as Record<string, unknown>;
+	const exif: ImageExifMetadata = {
+		make: typeof source.make === "string" ? source.make : undefined,
+		model: typeof source.model === "string" ? source.model : undefined,
+		lensModel: typeof source.lensModel === "string" ? source.lensModel : undefined,
+		dateTimeOriginal: toIsoString(source.dateTimeOriginal),
+		createDate: toIsoString(source.createDate),
+		modifyDate: toIsoString(source.modifyDate),
+		iso: toNumber(source.iso),
+		focalLength: toNumber(source.focalLength),
+		fNumber: toNumber(source.fNumber),
+		exposureTime:
+			typeof source.exposureTime === "string"
+				? source.exposureTime
+				: typeof source.exposureTime === "number"
+					? String(source.exposureTime)
+					: undefined,
+	};
+
+	return Object.values(exif).some((value) => value !== undefined) ? exif : undefined;
+}
+
+function parseExifMetadata(value: unknown): ImageExifMetadata | undefined {
+	if (typeof value !== "string" || !value.trim()) {
+		return undefined;
+	}
+	try {
+		return normalizeExifMetadata(JSON.parse(value));
+	} catch {
+		return undefined;
+	}
+}
+
+function buildImageMetadata(
+	category: string,
+	input?: Partial<ImageMetaData>,
+	defaults?: { originalName?: string; uploadedAt?: string },
+): ImageMetaData {
+	const normalizedExif = normalizeExifMetadata(input?.exif);
+	const takenAt = toIsoString(input?.takenAt) ?? normalizedExif?.dateTimeOriginal;
+	const createdAt = toIsoString(input?.createdAt) ?? normalizedExif?.createDate;
+	const uploadedAt = toIsoString(input?.uploadedAt) ?? defaults?.uploadedAt;
+
+	return {
+		tags: input?.tags ?? [],
+		category: input?.category ?? category,
+		originalName: input?.originalName ?? defaults?.originalName,
+		uploadedAt,
+		takenAt,
+		createdAt,
+		exif: normalizedExif,
+	};
+}
+
+function metadataFromCustomMetadata(
+	customMetadata: Record<string, string> | undefined,
+	category: string,
+	defaults?: { originalName?: string; uploadedAt?: string },
+): ImageMetaData {
+	return buildImageMetadata(
+		category,
+		{
+			tags: parseTags(customMetadata?.tags),
+			category: customMetadata?.category ?? category,
+			originalName: customMetadata?.originalName,
+			uploadedAt: customMetadata?.uploadedAt,
+			takenAt: customMetadata?.takenAt,
+			createdAt: customMetadata?.createdAt,
+			exif: parseExifMetadata(customMetadata?.exif),
+		},
+		defaults,
+	);
+}
+
+function serializeMetadata(metadata: ImageMetaData): Record<string, string> {
+	const serialized: Record<string, string> = {
+		category: metadata.category ?? "public",
+		originalName: metadata.originalName ?? "",
+		tags: JSON.stringify(metadata.tags ?? []),
+		uploadedAt: metadata.uploadedAt ?? new Date().toISOString(),
+	};
+
+	if (metadata.takenAt) {
+		serialized.takenAt = metadata.takenAt;
+	}
+	if (metadata.createdAt) {
+		serialized.createdAt = metadata.createdAt;
+	}
+	if (metadata.exif) {
+		serialized.exif = JSON.stringify(metadata.exif);
+	}
+
+	return serialized;
+}
+
+async function extractExifMetadata(fileData: ArrayBuffer): Promise<Partial<ImageMetaData>> {
+	try {
+		const parsed = await exifr.parse(fileData, { pick: [...exifPickKeys] });
+		if (!parsed || typeof parsed !== "object") {
+			return {};
+		}
+
+		const source = parsed as Record<string, unknown>;
+		const exif = normalizeExifMetadata({
+			make: source.Make,
+			model: source.Model,
+			lensModel: source.LensModel,
+			dateTimeOriginal: source.DateTimeOriginal,
+			createDate: source.CreateDate,
+			modifyDate: source.ModifyDate,
+			iso: source.ISO,
+			focalLength: source.FocalLength,
+			fNumber: source.FNumber,
+			exposureTime: source.ExposureTime,
+		});
+
+		return {
+			takenAt: exif?.dateTimeOriginal,
+			createdAt: exif?.createDate,
+			exif,
+		};
+	} catch {
+		return {};
+	}
+}
+
 function normalizeRemoteImage(input: Partial<RemoteImage> & { uuid: string; category: string }): RemoteImage {
+	const metadata = buildImageMetadata(input.category, input.meta, {
+		originalName: input.name ?? input.uuid,
+		uploadedAt: input.uploadedAt,
+	});
+
 	return {
 		uuid: input.uuid,
 		category: input.category,
-		name: input.name ?? input.uuid,
+		name: input.name ?? metadata.originalName ?? input.uuid,
 		deliveryUrl: input.deliveryUrl ?? buildPublicUrl(input.uuid, "original"),
-		uploadedAt: input.uploadedAt ?? new Date().toISOString(),
-		meta: {
-			tags: input.meta?.tags ?? [],
-			category: input.meta?.category ?? input.category,
-		},
+		uploadedAt: metadata.uploadedAt ?? new Date().toISOString(),
+		meta: metadata,
 	};
 }
 
@@ -221,19 +401,50 @@ function toIsoIfEpoch(input: unknown): string | null {
 function imageFromListObject(item: R2ListObjectLike): RemoteImage | null {
 	const parsed = parseOriginalKey(item.key);
 	if (!parsed) return null;
-	const tags = parseTags(item.customMetadata?.tags);
 	const categoryFromMeta = item.customMetadata?.category;
 	const resolvedCategory = categoryFromMeta || parsed.category || "public";
+	const metadata = metadataFromCustomMetadata(item.customMetadata, resolvedCategory, {
+		originalName: parsed.uuid,
+		uploadedAt: getUploadedIso(item.uploaded, item.customMetadata?.uploadedAt),
+	});
 	return normalizeRemoteImage({
 		uuid: parsed.uuid,
 		category: resolvedCategory,
-		name: item.customMetadata?.originalName || parsed.uuid,
-		uploadedAt: getUploadedIso(item.uploaded, item.customMetadata?.uploadedAt),
-		meta: {
-			tags,
-			category: resolvedCategory,
-		},
+		name: metadata.originalName || parsed.uuid,
+		uploadedAt: metadata.uploadedAt,
+		meta: metadata,
 	});
+}
+
+async function findStoredOriginalObject(
+	platform: PlatformLike,
+	id: string,
+	categoryHint?: string,
+): Promise<{ key: string; object: R2ObjectLike; resolvedCategory: string } | null> {
+	const bucket = getR2Bucket(platform);
+	if (!bucket) {
+		return null;
+	}
+
+	const canonicalKey = buildObjectKey(id, "original");
+	const keyCandidates = [canonicalKey];
+	if (categoryHint) {
+		keyCandidates.push(buildLegacyObjectKey(id, "original", categoryHint));
+	}
+	for (const category of defaultCategoryCandidates) {
+		if (categoryHint && category === categoryHint) continue;
+		keyCandidates.push(buildLegacyObjectKey(id, "original", category));
+	}
+
+	for (const key of keyCandidates) {
+		const object = await bucket.get(key);
+		if (!object?.body) continue;
+		const parsed = parseOriginalKey(key);
+		const resolvedCategory = object.customMetadata?.category || categoryHint || parsed?.category || "public";
+		return { key, object, resolvedCategory };
+	}
+
+	return null;
 }
 
 async function listR2ImagesPageByCategory(
@@ -335,27 +546,36 @@ function normalizeLegacyRow(row: Record<string, unknown>, idColumn: "uuid" | "id
 	const uploadedAt =
 		toIsoIfEpoch(row.uploaded_at) ?? toIsoIfEpoch(row.create_time) ?? new Date().toISOString();
 
-	let tags: string[] = [];
-	let metaCategory = category;
+	let parsedMeta: Partial<ImageMetaData> = {};
 	if (typeof row.meta === "string" && row.meta.trim()) {
 		try {
-			const parsed = JSON.parse(row.meta) as Partial<ImageMetaData>;
-			tags = parseTags(parsed.tags);
-			metaCategory = parsed.category ?? category;
+			parsedMeta = JSON.parse(row.meta) as Partial<ImageMetaData>;
 		} catch {
-			tags = parseTags(row.tags);
+			parsedMeta = {};
 		}
-	} else {
-		tags = parseTags(row.tags);
 	}
 
-	const resolvedCategory = metaCategory || category || "public";
+	const metadata = buildImageMetadata(category, {
+		...parsedMeta,
+		tags: parsedMeta.tags ? parseTags(parsedMeta.tags) : parseTags(row.tags),
+		category: parsedMeta.category ?? category,
+		originalName: parsedMeta.originalName ?? name,
+		uploadedAt: parsedMeta.uploadedAt ?? uploadedAt,
+		takenAt: toIsoIfEpoch(parsedMeta.takenAt) ?? undefined,
+		createdAt: toIsoIfEpoch(parsedMeta.createdAt) ?? undefined,
+		exif: normalizeExifMetadata(parsedMeta.exif),
+	}, {
+		originalName: name,
+		uploadedAt,
+	});
+
+	const resolvedCategory = metadata.category || category || "public";
 	return normalizeRemoteImage({
 		uuid: rawId,
 		category: resolvedCategory,
 		name,
-		uploadedAt,
-		meta: { tags, category: resolvedCategory },
+		uploadedAt: metadata.uploadedAt,
+		meta: metadata,
 	});
 }
 
@@ -488,28 +708,35 @@ export async function uploadImageToCloudflare(
 	const id = (requestedId ?? "").trim() || crypto.randomUUID();
 	const key = buildObjectKey(id, "original");
 	const uploadedAt = new Date().toISOString();
-	const tags = metadata?.tags ?? [];
+	const fileData = await file.arrayBuffer();
+	const extractedMetadata = await extractExifMetadata(fileData);
+	const nextMetadata = buildImageMetadata(category, {
+		...extractedMetadata,
+		...metadata,
+		tags: metadata?.tags ?? [],
+		originalName: metadata?.originalName ?? file.name,
+		uploadedAt,
+		exif: {
+			...(extractedMetadata.exif ?? {}),
+			...(metadata?.exif ?? {}),
+		},
+	}, {
+		originalName: file.name,
+		uploadedAt,
+	});
 
-	await bucket.put(key, await file.arrayBuffer(), {
+	await bucket.put(key, fileData, {
 		httpMetadata: {
 			contentType: file.type || "application/octet-stream",
 		},
-		customMetadata: {
-			category,
-			originalName: file.name,
-			tags: JSON.stringify(tags),
-			uploadedAt,
-		},
+		customMetadata: serializeMetadata(nextMetadata),
 	});
 
 	return normalizeRemoteImage({
 		uuid: id,
 		category,
 		name: file.name,
-		meta: {
-			tags,
-			category,
-		},
+		meta: nextMetadata,
 		uploadedAt,
 		deliveryUrl: buildPublicUrl(id, "original"),
 	});
@@ -559,31 +786,22 @@ export async function getImageById(
 	categoryHint?: string,
 ): Promise<RemoteImage | null> {
 	try {
-		const canonicalKey = buildObjectKey(id, "original");
-		const keyCandidates = [canonicalKey];
-		if (categoryHint) {
-			keyCandidates.push(buildLegacyObjectKey(id, "original", categoryHint));
-		}
-		for (const category of defaultCategoryCandidates) {
-			if (categoryHint && category === categoryHint) continue;
-			keyCandidates.push(buildLegacyObjectKey(id, "original", category));
-		}
-		for (const key of keyCandidates) {
-			const object = await getR2Bucket(platform)?.get(key);
-			if (!object?.body) continue;
-			const resolvedCategory = object.customMetadata?.category || categoryHint || "public";
+		const storedObject = await findStoredOriginalObject(platform, id, categoryHint);
+		if (storedObject) {
+			const metadata = metadataFromCustomMetadata(storedObject.object.customMetadata, storedObject.resolvedCategory, {
+				originalName: id,
+				uploadedAt: storedObject.object.customMetadata?.uploadedAt,
+			});
 			return normalizeRemoteImage({
 				uuid: id,
-				category: resolvedCategory,
-				name: object.customMetadata?.originalName ?? id,
-				uploadedAt: object.customMetadata?.uploadedAt,
-				meta: {
-					tags: parseTags(object.customMetadata?.tags),
-					category: resolvedCategory,
-				},
+				category: storedObject.resolvedCategory,
+				name: metadata.originalName ?? id,
+				uploadedAt: metadata.uploadedAt,
+				meta: metadata,
 			});
 		}
 
+		const canonicalKey = buildObjectKey(id, "original");
 		const legacyCandidates = Array.from(
 			new Set(
 				(defaultCategoryCandidates.concat(categoryHint ? [categoryHint] : [])).flatMap((category) =>
@@ -670,57 +888,70 @@ export async function updateImageMetadata(
 	}
 
 	const nextCategory = metadata.category ?? existing.category;
-	const nextTags = metadata.tags ?? existing.meta?.tags ?? [];
-	const nextOriginalName = metadata.originalName ?? existing.name ?? id;
-	const nextUploadedAt = metadata.uploadedAt ?? existing.uploadedAt ?? new Date().toISOString();
+	const nextMetadata = buildImageMetadata(nextCategory, {
+		...existing.meta,
+		...metadata,
+		tags: metadata.tags ?? existing.meta?.tags ?? [],
+		originalName: metadata.originalName ?? existing.meta?.originalName ?? existing.name ?? id,
+		uploadedAt: metadata.uploadedAt ?? existing.meta?.uploadedAt ?? existing.uploadedAt ?? new Date().toISOString(),
+		exif: {
+			...(existing.meta?.exif ?? {}),
+			...(metadata.exif ?? {}),
+		},
+	}, {
+		originalName: existing.name ?? id,
+		uploadedAt: existing.uploadedAt,
+	});
+	const storedObject = bucket ? await findStoredOriginalObject(platform, id, existing.category) : null;
 
-	if (bucket && existing.category !== nextCategory) {
+	if (bucket && storedObject && existing.category !== nextCategory && storedObject.key.startsWith(`images/${existing.category}/${id}/`)) {
 		const oldPrefix = `images/${existing.category}/${id}/`;
 		const listing = await bucket.list({ prefix: oldPrefix });
 		for (const item of listing.objects) {
 			const object = await bucket.get(item.key);
-			if (!object?.body) continue;
+			if (!object) continue;
+			const body = await materializeObjectBody(object?.body);
+			if (!body) continue;
 			const newKey = item.key.replace(oldPrefix, `images/${nextCategory}/${id}/`);
-			await bucket.put(newKey, object.body, {
+			await bucket.put(newKey, body, {
 				httpMetadata: object.httpMetadata,
-				customMetadata: {
-					...(object.customMetadata ?? {}),
-					category: nextCategory,
-					tags: JSON.stringify(nextTags),
-					originalName: nextOriginalName,
-					uploadedAt: nextUploadedAt,
-				},
+				customMetadata: serializeMetadata(nextMetadata),
 			});
 			await bucket.delete(item.key);
 		}
 	} else if (bucket) {
-		const originalKey = buildObjectKey(id, "original");
-		const object = await bucket.get(originalKey);
-		if (object?.body) {
-			await bucket.put(originalKey, object.body, {
-				httpMetadata: object.httpMetadata,
-				customMetadata: {
-					...(object.customMetadata ?? {}),
-					category: existing.category,
-					tags: JSON.stringify(nextTags),
-					originalName: nextOriginalName,
-					uploadedAt: nextUploadedAt,
-				},
+		const target = storedObject;
+		if (!target) {
+			return normalizeRemoteImage({
+				...existing,
+				category: nextCategory,
+				name: nextMetadata.originalName,
+				uploadedAt: nextMetadata.uploadedAt,
+				meta: nextMetadata,
 			});
+		}
+		const body = await materializeObjectBody(target.object.body);
+		if (body) {
+			const targetKey =
+				existing.category !== nextCategory && target.key.startsWith(`images/${existing.category}/${id}/`)
+					? target.key.replace(`images/${existing.category}/${id}/`, `images/${nextCategory}/${id}/`)
+					: target.key;
+			await bucket.put(targetKey, body, {
+				httpMetadata: target.object.httpMetadata,
+				customMetadata: serializeMetadata(nextMetadata),
+			});
+			if (targetKey !== target.key) {
+				await bucket.delete(target.key);
+			}
 		}
 	}
 
 	return normalizeRemoteImage({
 		...existing,
 		category: nextCategory,
-		name: nextOriginalName,
-		uploadedAt: nextUploadedAt,
-		meta: {
-			...existing.meta,
-			...metadata,
-			category: nextCategory,
-			tags: nextTags,
-		},
+		name: nextMetadata.originalName,
+		uploadedAt: nextMetadata.uploadedAt,
+		meta: nextMetadata,
 	});
 }
 

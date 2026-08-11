@@ -8,7 +8,6 @@
 	} from "radix-icons-svelte";
 	import type { PageServerData } from "./$types";
 	import { _ } from "svelte-i18n";
-	import EditMeta from "../../component/widget/EditMeta.svelte";
 	import Pagination from "../../component/widget/Pagination.svelte";
 	import type { RemoteImage } from "$lib/types";
 	import { Button, Checkbox, Spinner, Alert } from "flowbite-svelte";
@@ -30,6 +29,35 @@
 	let source = data.source;
 	let limit = data.limit;
 
+	function getDisplayTitle(remoteImage: RemoteImage) {
+		const title = remoteImage.meta?.originalName ?? remoteImage.name;
+		if (!title || title === remoteImage.uuid) {
+			return "";
+		}
+		return title;
+	}
+
+	function getDisplayDate(remoteImage: RemoteImage) {
+		const value =
+			remoteImage.meta?.takenAt ??
+			remoteImage.meta?.createdAt ??
+			remoteImage.uploadedAt;
+		if (!value) {
+			return "";
+		}
+
+		const date = new Date(value);
+		if (Number.isNaN(date.getTime())) {
+			return value.slice(0, 10);
+		}
+
+		return date.toLocaleDateString("zh-CN", {
+			year: "numeric",
+			month: "2-digit",
+			day: "2-digit",
+		});
+	}
+
 	// 如果進行了路由參數切換（例如分頁或分類導航），同步重置本地狀態
 	$: if (
 		data.category !== category ||
@@ -50,11 +78,6 @@
 		remoteImages = [...data.remoteImages];
 		checked_ids = {};
 	}
-
-	$: meta = {
-		category: category,
-		tags: [],
-	};
 
 	let confirmOpen = false;
 	let confirmBatch = false;
@@ -83,7 +106,7 @@
 				);
 				if (toDelete.length === 0) return;
 				for (const img of toDelete) {
-					await fetch(`/images/${img.uuid}`, { method: "DELETE" });
+					await fetch(`/images/${img.uuid}/delete`, { method: "DELETE" });
 				}
 				// 本地同步移除
 				remoteImages = remoteImages.filter((r) => !checked_ids[r.uuid]);
@@ -97,7 +120,7 @@
 				);
 			} else if (pendingSingle) {
 				const delId = pendingSingle;
-				await fetch(`/images/${delId}`, { method: "DELETE" });
+				await fetch(`/images/${delId}/delete`, { method: "DELETE" });
 				remoteImages = remoteImages.filter((i) => i.uuid !== delId);
 				if (checked_ids[delId]) delete checked_ids[delId];
 				notify.success($_("general.notification.delete_ok"));
@@ -112,34 +135,12 @@
 		}
 	}
 
-	const doEdit = async (imageUUID: string) => {
-		fetch(`./${category}/${imageUUID}/edit`, {
-			method: "PATCH",
-			body: JSON.stringify(meta),
-		}).then((response) => {
-			console.log(response);
-		});
-	};
-
 </script>
 
 <h1 class="title-page my-6 text-center">{$_("page.images.title")}</h1>
 
-<EditMeta bind:meta />
-
 <div class="m-auto my-8 flex items-center justify-center gap-4">
 	<Button tag="a" href="/upload" size="sm" color="alternative">{$_("page.upload.upload")}</Button>
-	<Button
-		size="sm"
-		color="alternative"
-		on:click={() => {
-			remoteImages.forEach(async (remote_image) => {
-				if (checked_ids[remote_image.uuid]) {
-					await doEdit(remote_image.uuid);
-				}
-			});
-		}}>{$_("page.images.batch_edit")}</Button
-	>
 	<Button size="sm" color="red" on:click={openConfirmBatch}
 		>{$_("page.images.batch_delete")}</Button
 	>
@@ -168,7 +169,7 @@
 				<img
 					src={`/delivery/${remoteImage.uuid}/square`}
 					loading="lazy"
-					class="cursor-pointer w-full h-56 object-cover rounded"
+					class="cursor-pointer w-full h-56 object-cover rounded-sm"
 					alt={remoteImage.uuid}
 				/>
 			</figure>
@@ -223,11 +224,10 @@
 				>
 			</div>
 			<div class="mt-2 text-xs text-muted space-y-1">
-				<div class="truncate">{remoteImage.name ?? remoteImage.uuid}</div>
-				<div>{remoteImage.uploadedAt ? new Date(remoteImage.uploadedAt).toLocaleString() : ""}</div>
-				{#if remoteImage.meta?.tags?.length}
-					<div class="truncate">#{remoteImage.meta.tags.join(" #")}</div>
+				{#if getDisplayTitle(remoteImage)}
+					<div class="truncate">{getDisplayTitle(remoteImage)}</div>
 				{/if}
+				<div>{getDisplayDate(remoteImage)}</div>
 			</div>
 		</div>
 	{/each}

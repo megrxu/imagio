@@ -17,9 +17,9 @@
     --page-bg: 241 245 249;
     --page-bg-accent: 226 232 240;
 
-    --radius-sm: 0.375rem;
-    --radius-md: 0.625rem;
-    --radius-lg: 0.875rem;
+    --radius-sm: 0.25rem;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
   }
 
   @media (prefers-color-scheme: dark) {

@@ -12,9 +12,25 @@ export interface RemoteImage {
     uploadedAt?: string
 }
 
+export interface ImageExifMetadata {
+    make?: string,
+    model?: string,
+    lensModel?: string,
+    dateTimeOriginal?: string,
+    createDate?: string,
+    modifyDate?: string,
+    iso?: number,
+    focalLength?: number,
+    fNumber?: number,
+    exposureTime?: string
+}
+
 export interface ImageMetaData {
     tags: string[],
     category?: string,
     originalName?: string,
-    uploadedAt?: string
+    uploadedAt?: string,
+    takenAt?: string,
+    createdAt?: string,
+    exif?: ImageExifMetadata
 }
