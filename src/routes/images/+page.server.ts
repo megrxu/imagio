@@ -1,50 +1,40 @@
 import type { RemoteImage } from '$lib/types';
 import type { PageServerLoad } from './$types';
-import { listImagesPage } from '$lib/cloudflare';
+import { listImagesByCategorySorted } from '$lib/cloudflare';
 
 export const load: PageServerLoad = async ({ url, platform }) => {
     const category = url.searchParams.get('category') ?? 'public';
-    const cursor = url.searchParams.get('cursor') ?? undefined;
-    const trailRaw = url.searchParams.get('trail') ?? '';
+    const pageRaw = parseInt(url.searchParams.get('page') ?? '1', 10);
+    const page = Number.isFinite(pageRaw) ? Math.max(1, pageRaw) : 1;
     const limit = Math.max(1, Math.min(48, parseInt(url.searchParams.get('limit') ?? '24', 10)));
 
-    const pageResult = await listImagesPage(platform, category, limit, cursor);
-    const remoteImages: RemoteImage[] = pageResult.items;
+    const result = await listImagesByCategorySorted(platform, category);
+    const allImages = result.items;
+    const totalItems = allImages.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+    const currentPage = Math.min(page, totalPages);
+    const offset = (currentPage - 1) * limit;
+    const remoteImages: RemoteImage[] = allImages.slice(offset, offset + limit);
 
-    let trail: string[] = [];
-    if (trailRaw) {
-        try {
-            const parsed = JSON.parse(atob(trailRaw));
-            if (Array.isArray(parsed)) {
-                trail = parsed.filter((item) => typeof item === 'string');
-            }
-        } catch {
-            trail = [];
-        }
-    }
-
-    const prevCursor = trail.length > 0 ? trail[trail.length - 1] : null;
-    const prevTrail = trail.slice(0, Math.max(0, trail.length - 1));
-    const nextTrail = cursor ? [...trail, cursor] : trail;
-    const prevTrailEncoded = prevTrail.length > 0 ? btoa(JSON.stringify(prevTrail)) : null;
-    const nextTrailEncoded = nextTrail.length > 0 ? btoa(JSON.stringify(nextTrail)) : null;
-
-    const prevHref = prevCursor
-        ? `${url.pathname}?category=${encodeURIComponent(category)}&limit=${limit}&cursor=${encodeURIComponent(prevCursor)}${prevTrailEncoded ? `&trail=${encodeURIComponent(prevTrailEncoded)}` : ''}`
+    const prevPage = currentPage > 1 ? currentPage - 1 : null;
+    const nextPage = currentPage < totalPages ? currentPage + 1 : null;
+    const prevHref = prevPage
+        ? `${url.pathname}?category=${encodeURIComponent(category)}&limit=${limit}&page=${prevPage}`
         : null;
-    const nextHref = pageResult.nextCursor
-        ? `${url.pathname}?category=${encodeURIComponent(category)}&limit=${limit}&cursor=${encodeURIComponent(pageResult.nextCursor)}${nextTrailEncoded ? `&trail=${encodeURIComponent(nextTrailEncoded)}` : ''}`
+    const nextHref = nextPage
+        ? `${url.pathname}?category=${encodeURIComponent(category)}&limit=${limit}&page=${nextPage}`
         : null;
 
     return {
         remoteImages,
-        cursor: cursor ?? null,
-        nextCursor: pageResult.nextCursor,
         prevHref,
         nextHref,
-        source: pageResult.source,
+        source: result.source,
         limit,
         category,
+        currentPage,
+        totalPages,
+        totalItems,
         path: url.pathname,
     }
 }

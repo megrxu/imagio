@@ -22,12 +22,15 @@
 	let remoteImages: RemoteImage[] = [...data.remoteImages];
 	let category = data.category;
 	let path = data.path;
-	let cursor = data.cursor;
-	let nextCursor = data.nextCursor;
 	let prevHref = data.prevHref;
 	let nextHref = data.nextHref;
-	let source = data.source;
 	let limit = data.limit;
+	let currentPage = data.currentPage;
+	let totalPages = data.totalPages;
+	let totalItems = data.totalItems;
+	let imageLoaded: Record<string, boolean> = Object.fromEntries(
+		remoteImages.map((item) => [item.uuid, false]),
+	);
 
 	function getDisplayTitle(remoteImage: RemoteImage) {
 		const title = remoteImage.meta?.originalName ?? remoteImage.name;
@@ -62,21 +65,46 @@
 	$: if (
 		data.category !== category ||
 		data.path !== path ||
-		data.cursor !== cursor ||
-		data.nextCursor !== nextCursor ||
+		data.currentPage !== currentPage ||
+		data.totalPages !== totalPages ||
+		data.totalItems !== totalItems ||
 		data.prevHref !== prevHref ||
 		data.nextHref !== nextHref
 	) {
 		category = data.category;
 		path = data.path;
-		cursor = data.cursor;
-		nextCursor = data.nextCursor;
+		currentPage = data.currentPage;
+		totalPages = data.totalPages;
+		totalItems = data.totalItems;
 		prevHref = data.prevHref;
 		nextHref = data.nextHref;
-		source = data.source;
 		limit = data.limit;
 		remoteImages = [...data.remoteImages];
+		imageLoaded = Object.fromEntries(
+			remoteImages.map((item) => [item.uuid, false]),
+		);
 		checked_ids = {};
+	}
+
+	function markImageLoaded(id: string) {
+		imageLoaded = {
+			...imageLoaded,
+			[id]: true,
+		};
+	}
+
+	function markIfImageComplete(node: HTMLImageElement, id: string) {
+		if (node.complete && node.naturalWidth > 0) {
+			markImageLoaded(id);
+		}
+
+		return {
+			update(nextId: string) {
+				if (node.complete && node.naturalWidth > 0) {
+					markImageLoaded(nextId);
+				}
+			},
+		};
 	}
 
 	let confirmOpen = false;
@@ -145,20 +173,28 @@
 		>{$_("page.images.batch_delete")}</Button
 	>
 </div>
-<Pagination {prevHref} {nextHref} />
-<div class="text-center text-xs text-muted mb-2">source: {source}</div>
+<Pagination
+	{prevHref}
+	{nextHref}
+	{path}
+	{category}
+	{limit}
+	{currentPage}
+	{totalPages}
+	{totalItems}
+/>
 {#if remoteImages.length === 0}
 	<Alert color="gray" class="my-2 w-full text-center"
 		>{$_("page.images.no_images")}</Alert
 	>
 {/if}
 <div class="my-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-	{#each remoteImages as remoteImage}
+	{#each remoteImages as remoteImage (remoteImage.uuid)}
 		<div>
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
 			<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 			<figure
-				class="my-2 mx-0"
+				class="my-2 mx-0 relative"
 				on:click={() => {
 					checked_ids = {
 						...checked_ids,
@@ -169,9 +205,17 @@
 				<img
 					src={`/delivery/${remoteImage.uuid}/square`}
 					loading="lazy"
-					class="cursor-pointer w-full h-56 object-cover rounded-sm"
+					class={`cursor-pointer w-full h-56 object-cover rounded-sm transition-opacity duration-200 ${imageLoaded[remoteImage.uuid] ? "opacity-100" : "opacity-0"}`}
 					alt={remoteImage.uuid}
+					use:markIfImageComplete={remoteImage.uuid}
+					on:load={() => markImageLoaded(remoteImage.uuid)}
+					on:error={() => markImageLoaded(remoteImage.uuid)}
 				/>
+				{#if !imageLoaded[remoteImage.uuid]}
+					<div class="absolute inset-0 flex items-center justify-center rounded-sm bg-black/30 backdrop-blur-[1px]">
+						<Spinner size="6" />
+					</div>
+				{/if}
 			</figure>
 			<div class="flex items-center gap-1">
 				<Checkbox
@@ -232,7 +276,16 @@
 		</div>
 	{/each}
 </div>
-<Pagination {prevHref} {nextHref} />
+<Pagination
+	{prevHref}
+	{nextHref}
+	{path}
+	{category}
+	{limit}
+	{currentPage}
+	{totalPages}
+	{totalItems}
+/>
 
 <!-- Delete Confirmation Modal -->
 <Modal size="md" open={confirmOpen} on:close={() => (confirmOpen = false)}>

@@ -357,6 +357,43 @@ function sortImagesByUploadedAt(images: RemoteImage[]): RemoteImage[] {
 	return [...images].sort((a, b) => (b.uploadedAt ?? "").localeCompare(a.uploadedAt ?? ""));
 }
 
+async function listR2ImagesByCategory(platform: PlatformLike, category: string): Promise<RemoteImage[]> {
+	const bucket = getR2Bucket(platform);
+	if (!bucket) {
+		return [];
+	}
+
+	const items: RemoteImage[] = [];
+	const seen = new Set<string>();
+	let cursor: string | undefined;
+	let truncated = true;
+	let loops = 0;
+	const maxLoops = 200;
+
+	while (truncated && loops < maxLoops) {
+		loops += 1;
+		const response = await bucket.list({
+			prefix: "images/",
+			limit: 1000,
+			cursor,
+		});
+
+		for (const object of response.objects) {
+			const image = imageFromListObject(object);
+			if (!image) continue;
+			if (image.category !== category) continue;
+			if (seen.has(image.uuid)) continue;
+			seen.add(image.uuid);
+			items.push(image);
+		}
+
+		truncated = Boolean(response.truncated);
+		cursor = response.cursor;
+	}
+
+	return sortImagesByUploadedAt(items);
+}
+
 function parseOriginalKey(key: string): { category?: string; uuid: string } | null {
 	const match = key.match(/^images\/([^/]+)\/([^/]+)\/original$/i);
 	if (match) {
@@ -772,6 +809,28 @@ export async function listImagesPage(
 	} catch (error) {
 		console.error("listImagesPage failed", error);
 		return { items: [], nextCursor: null, source: "empty" };
+	}
+}
+
+export async function listImagesByCategorySorted(
+	platform: PlatformLike,
+	category: string,
+): Promise<{ items: RemoteImage[]; source: "r2" | "d1-fallback" | "empty" }> {
+	try {
+		const fromR2 = await listR2ImagesByCategory(platform, category);
+		if (fromR2.length > 0) {
+			return { items: fromR2, source: "r2" };
+		}
+
+		const fromD1 = await listLegacyImagesByCategory(platform, category);
+		if (fromD1.length > 0) {
+			return { items: fromD1, source: "d1-fallback" };
+		}
+
+		return { items: [], source: "empty" };
+	} catch (error) {
+		console.error("listImagesByCategorySorted failed", error);
+		return { items: [], source: "empty" };
 	}
 }
 
