@@ -48,6 +48,7 @@ interface D1DatabaseLike {
 type CloudflareEnv = {
 	IMAGIO_R2?: R2BucketLike;
 	IMAGIO_DB?: D1DatabaseLike;
+	IMAGES?: App.ImagesBinding;
 	TOKEN?: string;
 };
 
@@ -132,6 +133,10 @@ function getEnv(platform: PlatformLike): CloudflareEnv {
 
 export function getR2Bucket(platform: PlatformLike): R2BucketLike | undefined {
 	return getEnv(platform).IMAGIO_R2;
+}
+
+export function getImagesBinding(platform: PlatformLike): App.ImagesBinding | undefined {
+	return getEnv(platform).IMAGES;
 }
 
 export function getDeliverySignatureSecret(platform: PlatformLike): string | undefined {

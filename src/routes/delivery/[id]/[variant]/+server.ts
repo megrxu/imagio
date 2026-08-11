@@ -1,4 +1,4 @@
-import { getDeliverySignatureSecret, getImageById, getR2Bucket, verifySignedDeliveryAccess } from '$lib/cloudflare';
+import { getDeliverySignatureSecret, getImageById, getImagesBinding, getR2Bucket, verifySignedDeliveryAccess } from '$lib/cloudflare';
 
 const allowedVariants = new Set(['original', 'square', 'thumb', 'avatar', 'small', 'medium', 'large', 'banner', 'embed']);
 const allowedFormats = new Set(['jpeg', 'jpg', 'png', 'webp', 'avif']);
@@ -34,6 +34,19 @@ function resolveOutputFormat(request: Request, searchParams: URLSearchParams) {
     return 'jpeg';
 }
 
+function resolveOutputMimeType(format: string) {
+    switch (format) {
+        case 'avif':
+            return 'image/avif';
+        case 'webp':
+            return 'image/webp';
+        case 'jpeg':
+        case 'jpg':
+        default:
+            return 'image/jpeg';
+    }
+}
+
 function buildTransformOptions(variant: string, request: Request, searchParams: URLSearchParams) {
     if (variant === 'original') {
         return null;
@@ -65,6 +78,11 @@ function buildTransformOptions(variant: string, request: Request, searchParams: 
 
     switch (variant) {
         case 'square':
+            options.width = 240;
+            options.height = 240;
+            options.fit = 'cover';
+            options.quality = options.quality ?? 'high';
+            break;
         case 'thumb':
         case 'avatar':
             options.width = options.width ?? 240;
@@ -112,22 +130,19 @@ function buildTransformOptions(variant: string, request: Request, searchParams: 
     return options;
 }
 
-function toBase64(value: ArrayBuffer): string {
-    const bytes = new Uint8Array(value);
-    let binary = '';
-    for (const byte of bytes) {
-        binary += String.fromCharCode(byte);
-    }
-    return btoa(binary);
-}
-
 async function renderVariantFromOriginal(
     bucket: NonNullable<ReturnType<typeof getR2Bucket>>,
+    images: NonNullable<ReturnType<typeof getImagesBinding>>,
     id: string,
     variant: string,
     transformOptions: Record<string, string | number>,
 ) {
     const format = String(transformOptions.format ?? 'jpeg');
+    const outputFormat = resolveOutputMimeType(format);
+    const outputQuality = transformOptions.quality;
+    const bindingTransformOptions = Object.fromEntries(
+        Object.entries(transformOptions).filter(([key]) => key !== 'format' && key !== 'quality'),
+    );
     const parts = Object.entries(transformOptions)
         .filter(([key]) => key !== 'format')
         .sort(([left], [right]) => left.localeCompare(right))
@@ -148,21 +163,26 @@ async function renderVariantFromOriginal(
         return null;
     }
 
-    const originalBuffer = await new Response(original.body).arrayBuffer();
-    const originalContentType = original.httpMetadata?.contentType ?? 'application/octet-stream';
-    const dataUrl = `data:${originalContentType};base64,${toBase64(originalBuffer)}`;
-    const transformed = await fetch(dataUrl, {
-        cf: {
-            image: transformOptions,
-        },
-    });
-
-    if (!transformed.ok) {
+    const sourceBody = original.body instanceof ReadableStream
+        ? original.body
+        : new Response(original.body).body;
+    if (!sourceBody) {
         return null;
     }
 
-    const transformedBuffer = await transformed.arrayBuffer();
-    const transformedContentType = transformed.headers.get('content-type') ?? 'application/octet-stream';
+    const transformed = await images.input(sourceBody)
+        .transform(bindingTransformOptions)
+        .output({
+            format: outputFormat,
+            ...(outputQuality !== undefined ? { quality: outputQuality as string | number } : {}),
+        });
+    const transformedResponse = transformed.response();
+    if (!transformedResponse.ok) {
+        return null;
+    }
+
+    const transformedBuffer = await transformedResponse.arrayBuffer();
+    const transformedContentType = transformedResponse.headers.get('content-type') ?? outputFormat;
     await bucket.put(cacheKey, transformedBuffer, {
         httpMetadata: { contentType: transformedContentType },
     });
@@ -229,6 +249,11 @@ export async function GET({ request, params: { id, variant }, platform }) {
         return new Response('Image delivery is not configured', { status: 500 });
     }
 
+    const images = getImagesBinding(platform);
+    if (!images) {
+        return new Response('Image optimization binding is not configured', { status: 500 });
+    }
+
     if (normalizedVariant === 'original') {
         const object = await bucket.get(`images/${id}/original`);
         if (!object?.body) {
@@ -249,7 +274,7 @@ export async function GET({ request, params: { id, variant }, platform }) {
         return new Response('Unsupported variant', { status: 400 });
     }
 
-    const rendered = await renderVariantFromOriginal(bucket, id, normalizedVariant, transformOptions);
+    const rendered = await renderVariantFromOriginal(bucket, images, id, normalizedVariant, transformOptions);
     if (!rendered?.body) {
         return new Response('Not found', { status: 404 });
     }
