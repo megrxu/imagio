@@ -1,6 +1,6 @@
 import type { RemoteImage } from '$lib/types';
 import type { PageServerLoad } from './$types';
-import { listImagesByCategorySorted } from '$lib/cloudflare';
+import { buildSignedDeliveryUrl, listImagesByCategorySorted } from '$lib/cloudflare';
 
 export const load: PageServerLoad = async ({ url, platform }) => {
     const category = url.searchParams.get('category') ?? 'public';
@@ -14,7 +14,12 @@ export const load: PageServerLoad = async ({ url, platform }) => {
     const totalPages = Math.max(1, Math.ceil(totalItems / limit));
     const currentPage = Math.min(page, totalPages);
     const offset = (currentPage - 1) * limit;
-    const remoteImages: RemoteImage[] = allImages.slice(offset, offset + limit);
+    const remoteImages: RemoteImage[] = await Promise.all(
+        allImages.slice(offset, offset + limit).map(async (image) => ({
+            ...image,
+            deliveryUrl: await buildSignedDeliveryUrl(image.uuid, 'original', platform),
+        })),
+    );
 
     const prevPage = currentPage > 1 ? currentPage - 1 : null;
     const nextPage = currentPage < totalPages ? currentPage + 1 : null;

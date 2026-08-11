@@ -233,7 +233,7 @@
 				>
 				<Button
 					tag="a"
-					href={`/delivery/${remoteImage.uuid}/original`}
+					href={remoteImage.deliveryUrl ?? `/delivery/${remoteImage.uuid}/original`}
 					color="none"
 					size="xs"
 					class="p-1 hover:bg-transparent focus:ring-0"

@@ -1,6 +1,6 @@
-import { getImageById, getOrMigrateObject, getR2Bucket } from '$lib/cloudflare';
+import { getDeliverySignatureSecret, getImageById, getOrMigrateObject, getR2Bucket, verifySignedDeliveryAccess } from '$lib/cloudflare';
 
-const allowedVariants = new Set(['original', 'square', 'thumb', 'avatar', 'small', 'medium', 'large', 'public', 'private']);
+const allowedVariants = new Set(['original', 'square', 'thumb', 'avatar', 'small', 'medium', 'large', 'embed', 'public', 'private']);
 const allowedFormats = new Set(['jpeg', 'jpg', 'png', 'webp', 'avif']);
 const allowedFits = new Set(['cover', 'contain', 'crop', 'pad', 'scale-down']);
 
@@ -71,6 +71,11 @@ function buildTransformOptions(variant: string, request: Request, searchParams: 
             options.width = options.width ?? 240;
             options.height = options.height ?? 240;
             options.fit = options.fit ?? 'cover';
+            options.quality = options.quality ?? 'high';
+            break;
+        case 'embed':
+            options.width = options.width ?? 1024;
+            options.fit = options.fit ?? 'scale-down';
             options.quality = options.quality ?? 'high';
             break;
         case 'small':
@@ -211,6 +216,29 @@ export async function GET({ request, params: { id, variant }, platform }) {
     const normalizedVariant = normalizeVariant(variant);
     if (!normalizedVariant) {
         return new Response('Unsupported variant', { status: 400 });
+    }
+
+    if (normalizedVariant === 'original') {
+        const secret = getDeliverySignatureSecret(platform);
+        if (secret && !(await verifySignedDeliveryAccess(secret, id, normalizedVariant, request.url))) {
+            return new Response('Forbidden', { status: 403 });
+        }
+
+        const referer = request.headers.get('referer');
+        if (!referer) {
+            return new Response('Forbidden', { status: 403 });
+        }
+
+        try {
+            const refererUrl = new URL(referer);
+            const requestUrl = new URL(request.url);
+            const isImagesPage = refererUrl.origin === requestUrl.origin && (refererUrl.pathname === '/images' || refererUrl.pathname.startsWith('/images/'));
+            if (!isImagesPage) {
+                return new Response('Forbidden', { status: 403 });
+            }
+        } catch {
+            return new Response('Forbidden', { status: 403 });
+        }
     }
 
     const legacyCategoryAlias = normalizedVariant === 'public' || normalizedVariant === 'private' ? normalizedVariant : null;

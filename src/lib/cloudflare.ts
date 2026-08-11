@@ -101,6 +101,10 @@ export function getR2Bucket(platform: PlatformLike): R2BucketLike | undefined {
 	return getEnv(platform).IMAGIO_R2;
 }
 
+export function getDeliverySignatureSecret(platform: PlatformLike): string | undefined {
+	return getEnv(platform).TOKEN;
+}
+
 function getD1Database(platform: PlatformLike): D1DatabaseLike | undefined {
 	return getEnv(platform).IMAGIO_DB;
 }
@@ -123,6 +127,66 @@ function buildLegacyObjectKey(id: string, variant = "original", category?: strin
 
 function buildPublicUrl(id: string, variant = "original") {
 	return `/delivery/${id}/${variant}`;
+}
+
+function toBase64Url(value: ArrayBuffer): string {
+	const bytes = new Uint8Array(value);
+	let binary = "";
+	for (const byte of bytes) {
+		binary += String.fromCharCode(byte);
+	}
+	return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function signDeliveryAccess(secret: string, payload: string): Promise<string> {
+	const key = await crypto.subtle.importKey(
+		"raw",
+		new TextEncoder().encode(secret),
+		{ name: "HMAC", hash: "SHA-256" },
+		false,
+		["sign"],
+	);
+	const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+	return toBase64Url(signature);
+}
+
+export async function buildSignedDeliveryUrl(
+	id: string,
+	variant = "original",
+	platform: PlatformLike,
+	expiresInSeconds = 600,
+): Promise<string> {
+	const baseUrl = buildPublicUrl(id, variant);
+	if (variant !== "original") {
+		return baseUrl;
+	}
+
+	const secret = getDeliverySignatureSecret(platform);
+	if (!secret) {
+		return baseUrl;
+	}
+
+	const expiresAt = Math.floor(Date.now() / 1000) + Math.max(30, Math.floor(expiresInSeconds));
+	const payload = `${id}:${variant}:${expiresAt}`;
+	const signature = await signDeliveryAccess(secret, payload);
+	return `${baseUrl}?exp=${expiresAt}&sig=${encodeURIComponent(signature)}`;
+}
+
+export async function verifySignedDeliveryAccess(
+	secret: string,
+	id: string,
+	variant: string,
+	requestUrl: string | URL,
+): Promise<boolean> {
+	const url = typeof requestUrl === "string" ? new URL(requestUrl) : requestUrl;
+	const expiresAt = Number.parseInt(url.searchParams.get("exp") ?? "", 10);
+	const signature = url.searchParams.get("sig") ?? "";
+	if (!Number.isFinite(expiresAt) || expiresAt < Math.floor(Date.now() / 1000) || !signature) {
+		return false;
+	}
+
+	const expectedSignature = await signDeliveryAccess(secret, `${id}:${variant}:${expiresAt}`);
+	return signature === expectedSignature;
 }
 
 function buildLegacySourceCandidates(id: string, category: string, originalName?: string): string[] {
