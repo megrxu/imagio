@@ -1,6 +1,6 @@
 import { getDeliverySignatureSecret, getImageById, getOrMigrateObject, getR2Bucket, verifySignedDeliveryAccess } from '$lib/cloudflare';
 
-const allowedVariants = new Set(['original', 'square', 'thumb', 'avatar', 'small', 'medium', 'large', 'embed', 'public', 'private']);
+const allowedVariants = new Set(['original', 'square', 'thumb', 'avatar', 'small', 'medium', 'large', 'banner', 'embed', 'public', 'private']);
 const allowedFormats = new Set(['jpeg', 'jpg', 'png', 'webp', 'avif']);
 const allowedFits = new Set(['cover', 'contain', 'crop', 'pad', 'scale-down']);
 
@@ -91,6 +91,12 @@ function buildTransformOptions(variant: string, request: Request, searchParams: 
         case 'large':
             options.width = options.width ?? 1600;
             options.fit = options.fit ?? 'scale-down';
+            options.quality = options.quality ?? 'high';
+            break;
+        case 'banner':
+            options.width = options.width ?? 800;
+            options.height = options.height ?? 400;
+            options.fit = options.fit ?? 'cover';
             options.quality = options.quality ?? 'high';
             break;
         default:
