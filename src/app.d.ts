@@ -14,7 +14,6 @@ declare global {
 				ACCOUNT_ID?: string;
 				SERVER_URL?: string;
 				TOKEN?: string;
-				S3_PUBLIC_ACCESS_ENDPOINT?: string;
 				ASSETS?: AssetsBinding;
 				IMAGIO_R2?: R2Bucket;
 				IMAGIO_DB?: D1Database;

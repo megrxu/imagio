@@ -12,9 +12,8 @@ To build and deploy imagio, follow the steps below:
 1. Fork and set up Cloudflare Pages with SvelteKit.
 2. Set up environment variables in your Cloudflare dashboard:
    1. `ACCOUNT_ID`: The account id specified when running the server.
-   2. `TOKEN`: Not used currently.
+   2. `TOKEN`: Used for signed access to original image delivery URLs.
    3. `SERVER_URL`: Your imagio-server instance URL.
-   3. `S3_PUBLIC_ACCESS_ENDPOINT`: Your S3 public access endpoint.
 3. Publish your pages.
 
 ## Endpoints
@@ -23,7 +22,6 @@ Imagio provides the following endpoints:
 
 - `/upload`: to upload images.
 - `/images`: to list and modify uploaded images.
-- `/admin/init-d1-index` (POST): initialize/backfill D1 image index from R2 objects (requires admin token).
 
 ## Local Cloudflare Runtime
 
@@ -44,13 +42,4 @@ Apply migration SQL before enabling D1-backed listing:
 
 ```bash
 pnpm wrangler d1 migrations apply imagio-local --local --config wrangler.local.toml
-```
-
-Initialize/backfill data from R2 into D1 index:
-
-```bash
-curl -X POST http://127.0.0.1:8788/admin/init-d1-index \
-   -H 'Authorization: Bearer local-dev-token' \
-   -H 'content-type: application/json' \
-   -d '{"limit":200,"maxPages":5}'
 ```

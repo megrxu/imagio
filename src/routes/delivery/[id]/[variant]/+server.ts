@@ -1,6 +1,6 @@
-import { getDeliverySignatureSecret, getImageById, getOrMigrateObject, getR2Bucket, verifySignedDeliveryAccess } from '$lib/cloudflare';
+import { getDeliverySignatureSecret, getImageById, getR2Bucket, verifySignedDeliveryAccess } from '$lib/cloudflare';
 
-const allowedVariants = new Set(['original', 'square', 'thumb', 'avatar', 'small', 'medium', 'large', 'banner', 'embed', 'public', 'private']);
+const allowedVariants = new Set(['original', 'square', 'thumb', 'avatar', 'small', 'medium', 'large', 'banner', 'embed']);
 const allowedFormats = new Set(['jpeg', 'jpg', 'png', 'webp', 'avif']);
 const allowedFits = new Set(['cover', 'contain', 'crop', 'pad', 'scale-down']);
 
@@ -39,9 +39,8 @@ function buildTransformOptions(variant: string, request: Request, searchParams: 
         return null;
     }
 
-    const format = resolveOutputFormat(request, searchParams);
     const options: Record<string, string | number> = {
-        format,
+        format: resolveOutputFormat(request, searchParams),
     };
 
     const width = clampInt(searchParams.get('width'), 16, 4096);
@@ -106,115 +105,71 @@ function buildTransformOptions(variant: string, request: Request, searchParams: 
             break;
     }
 
+    if (!allowedFits.has(String(options.fit ?? ''))) {
+        return null;
+    }
+
     return options;
 }
 
-function buildVariantCacheKey(id: string, variant: string, transformOptions: Record<string, string | number> | null) {
-    const base = `images/${id}/${variant}`;
-    if (!transformOptions) {
-        return base;
+function toBase64(value: ArrayBuffer): string {
+    const bytes = new Uint8Array(value);
+    let binary = '';
+    for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
     }
+    return btoa(binary);
+}
 
+async function renderVariantFromOriginal(
+    bucket: NonNullable<ReturnType<typeof getR2Bucket>>,
+    id: string,
+    variant: string,
+    transformOptions: Record<string, string | number>,
+) {
     const format = String(transformOptions.format ?? 'jpeg');
     const parts = Object.entries(transformOptions)
         .filter(([key]) => key !== 'format')
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([key, value]) => `${key}-${String(value)}`);
-
-    if (parts.length > 0) {
-        return `${base}/${format}/${parts.join('__')}`;
-    }
-
-    return `${base}/${format}`;
-}
-
-function buildLegacySourceCandidates(id: string, category: string, originalName?: string) {
-    const candidates = new Set<string>();
-    const normalizedCategory = category?.trim() || 'public';
-    const basePrefix = `images/${normalizedCategory}`;
-    const extensions = ['JPEG', 'PNG'];
-
-    for (const ext of extensions) {
-        candidates.add(`${basePrefix}/${id}.${ext}`);
-    }
-    candidates.add(`${basePrefix}/${id}`);
-    candidates.add(`${basePrefix}/${id}/original`);
-
-    if (typeof originalName === 'string') {
-        const trimmed = originalName.trim();
-        if (trimmed) {
-            candidates.add(`${basePrefix}/${trimmed}`);
-            for (const ext of extensions) {
-                candidates.add(`${basePrefix}/${trimmed}.${ext}`);
-            }
-        }
-    }
-
-    return [...candidates];
-}
-
-async function getOrRenderVariant(
-    platform: any,
-    request: Request,
-    category: string,
-    id: string,
-    variant: string,
-    transformOptions: Record<string, string | number> | null,
-) {
-    const bucket = getR2Bucket(platform);
-    if (!bucket) {
-        return null;
-    }
-
-    const cacheKey = buildVariantCacheKey(id, variant, transformOptions);
+    const cacheKey = parts.length > 0
+        ? `images/${id}/${variant}/${format}/${parts.join('__')}`
+        : `images/${id}/${variant}/${format}`;
     const cached = await bucket.get(cacheKey);
     if (cached?.body) {
         return {
-            key: cacheKey,
-            object: cached,
+            body: cached.body,
+            contentType: cached.httpMetadata?.contentType,
         };
     }
 
-    if (!transformOptions) {
+    const original = await bucket.get(`images/${id}/original`);
+    if (!original?.body) {
         return null;
     }
 
-    const sourceUrl = new URL(request.url);
-    sourceUrl.pathname = sourceUrl.pathname.replace(/\/[^/]+$/, '/original');
-    const headers = new Headers(request.headers);
-    headers.set('x-imagio-internal-source', '1');
-
-    const response = await fetch(sourceUrl.toString(), {
-        headers,
-        method: 'GET',
+    const originalBuffer = await new Response(original.body).arrayBuffer();
+    const originalContentType = original.httpMetadata?.contentType ?? 'application/octet-stream';
+    const dataUrl = `data:${originalContentType};base64,${toBase64(originalBuffer)}`;
+    const transformed = await fetch(dataUrl, {
         cf: {
             image: transformOptions,
-        } as { image: Record<string, string | number> },
+        },
     });
 
-    if (!response.ok) {
+    if (!transformed.ok) {
         return null;
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    const contentType = response.headers.get('content-type') ?? 'application/octet-stream';
-    await bucket.put(cacheKey, arrayBuffer, {
-        httpMetadata: { contentType },
-        customMetadata: {
-            category,
-            imageId: id,
-            variant,
-            format: String(transformOptions.format ?? 'jpeg'),
-            source: 'transformed',
-        },
+    const transformedBuffer = await transformed.arrayBuffer();
+    const transformedContentType = transformed.headers.get('content-type') ?? 'application/octet-stream';
+    await bucket.put(cacheKey, transformedBuffer, {
+        httpMetadata: { contentType: transformedContentType },
     });
 
     return {
-        key: cacheKey,
-        object: {
-            body: arrayBuffer,
-            httpMetadata: { contentType },
-        },
+        body: transformedBuffer,
+        contentType: transformedContentType,
     };
 }
 
@@ -247,9 +202,7 @@ export async function GET({ request, params: { id, variant }, platform }) {
         }
     }
 
-    const legacyCategoryAlias = normalizedVariant === 'public' || normalizedVariant === 'private' ? normalizedVariant : null;
-    const effectiveVariant = legacyCategoryAlias ? 'original' : normalizedVariant;
-    const image = await getImageById(platform, id, legacyCategoryAlias ?? undefined);
+    const image = await getImageById(platform, id);
     if (!image) {
         return new Response('Not found', { status: 404 });
     }
@@ -276,72 +229,37 @@ export async function GET({ request, params: { id, variant }, platform }) {
         return new Response('Image delivery is not configured', { status: 500 });
     }
 
-    const isInternalSource = request.headers.get('x-imagio-internal-source') === '1';
-    const requestedKey = isInternalSource
-        ? `images/${id}/original`
-        : `images/${id}/${effectiveVariant}`;
-    const candidates = [
-        requestedKey,
-        !isInternalSource && effectiveVariant !== 'original' ? `images/${id}/original` : null,
-        `images/${imageCategory}/${id}/original`,
-        !isInternalSource && effectiveVariant !== 'original' ? `images/${imageCategory}/${id}/${effectiveVariant}` : null,
-    ].filter(Boolean) as string[];
-
-    const transformOptions = buildTransformOptions(effectiveVariant, request, new URL(request.url).searchParams);
-    if (transformOptions && !isInternalSource) {
-        const rendered = await getOrRenderVariant(
-            platform,
-            request,
-            imageCategory,
-            id,
-            effectiveVariant,
-            transformOptions,
-        );
-        if (rendered?.object.body) {
-            const headers = new Headers();
-            if (rendered.object.httpMetadata?.contentType) {
-                headers.set('content-type', rendered.object.httpMetadata.contentType);
-            }
-            headers.set('cache-control', imageCategory === 'private' ? 'private, no-store' : 'public, max-age=31536000, immutable');
-            headers.set('content-disposition', `inline; filename="${id}-${variant}"`);
-            return new Response(rendered.object.body, { status: 200, headers });
+    if (normalizedVariant === 'original') {
+        const object = await bucket.get(`images/${id}/original`);
+        if (!object?.body) {
+            return new Response('Not found', { status: 404 });
         }
+
+        const headers = new Headers();
+        if (object.httpMetadata?.contentType) {
+            headers.set('content-type', object.httpMetadata.contentType);
+        }
+        headers.set('cache-control', imageCategory === 'private' ? 'private, no-store' : 'public, max-age=31536000, immutable');
+        headers.set('content-disposition', `inline; filename="${id}-${variant}"`);
+        return new Response(object.body, { status: 200, headers });
     }
 
-    for (const key of candidates) {
-        const object = await getOrMigrateObject(platform, key, {
-            migrateFromLegacy: key.endsWith('/original'),
-            customMetadata: key.endsWith('/original')
-                ? {
-                    category: image.category,
-                    originalName: image.meta?.originalName ?? image.name ?? id,
-                    uploadedAt: image.meta?.uploadedAt ?? image.uploadedAt ?? '',
-                    tags: JSON.stringify(image.meta?.tags ?? []),
-                    takenAt: image.meta?.takenAt ?? '',
-                    createdAt: image.meta?.createdAt ?? '',
-                    exif: image.meta?.exif ? JSON.stringify(image.meta.exif) : '',
-                }
-                : undefined,
-            legacySourceKeys: buildLegacySourceCandidates(
-                id,
-                imageCategory,
-                image.name,
-            ).concat(
-                legacyCategoryAlias
-                    ? buildLegacySourceCandidates(id, legacyCategoryAlias, image.name)
-                    : [],
-            ),
-        });
-        if (object?.body) {
-            const headers = new Headers();
-            if (object.httpMetadata?.contentType) {
-                headers.set('content-type', object.httpMetadata.contentType);
-            }
-            headers.set('cache-control', imageCategory === 'private' ? 'private, no-store' : 'public, max-age=31536000, immutable');
-            headers.set('content-disposition', `inline; filename="${id}-${variant}"`);
-            return new Response(object.body, { status: 200, headers });
-        }
+    const transformOptions = buildTransformOptions(normalizedVariant, request, new URL(request.url).searchParams);
+    if (!transformOptions) {
+        return new Response('Unsupported variant', { status: 400 });
     }
 
-    return new Response('Not found', { status: 404 });
+    const rendered = await renderVariantFromOriginal(bucket, id, normalizedVariant, transformOptions);
+    if (!rendered?.body) {
+        return new Response('Not found', { status: 404 });
+    }
+
+    const headers = new Headers();
+    if (rendered.contentType) {
+        headers.set('content-type', rendered.contentType);
+    }
+    headers.set('cache-control', imageCategory === 'private' ? 'private, no-store' : 'public, max-age=31536000, immutable');
+    headers.set('content-disposition', `inline; filename="${id}-${variant}"`);
+    return new Response(rendered.body, { status: 200, headers });
+
 }

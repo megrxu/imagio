@@ -8,7 +8,6 @@ directory = ".svelte-kit/output/client"
 binding = "ASSETS"
 
 [vars]
-S3_PUBLIC_ACCESS_ENDPOINT = ""
 TOKEN = "local-dev-token"
 
 [[r2_buckets]]

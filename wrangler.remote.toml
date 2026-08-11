@@ -1,0 +1,9 @@
+name = "imagio-remote-migrate"
+compatibility_date = "2026-08-08"
+
+[[d1_databases]]
+binding = "IMAGIO_DB"
+database_name = "imagio-db"
+database_id = "27bc1551-278f-4c10-ad91-6eeba3533fd6"
+preview_database_id = "27bc1551-278f-4c10-ad91-6eeba3533fd6"
+migrations_dir = "migrations"
